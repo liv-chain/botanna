@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AveManiaBot", "AveManiaBot.csproj", "{AAE2D4C4-C888-4624-B9ED-68E8C1EAA430}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AAE2D4C4-C888-4624-B9ED-68E8C1EAA430}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AAE2D4C4-C888-4624-B9ED-68E8C1EAA430}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AAE2D4C4-C888-4624-B9ED-68E8C1EAA430}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AAE2D4C4-C888-4624-B9ED-68E8C1EAA430}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

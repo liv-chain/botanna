@@ -1,0 +1,63 @@
+# Ignore Visual Studio temporary files, build results, and
+# build logs.
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+.vs/
+.vscode/
+
+# Ignore Rider project files
+.idea/
+
+# Ignore NuGet packages
+*.nupkg
+*.snupkg
+*.nuspec
+
+# Ignore User-Specific files
+*.rsuser
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Ignore build-related files
+*.log
+*.tlog
+*.log2
+*.cache
+*.ilk
+*.meta
+*.obj
+*.pdb
+*.rsp
+*.tmp
+
+# Ignore .NET Core-related directories
+.project/
+.DS_Store
+*.dbmdl
+
+# Ignore published outputs
+.publish/
+
+# Ignore npm package files if applicable
+node_modules/
+
+# Ignore any other dependencies or generated code
+lib/
+
+# Ignore test results
+TestResults/
+*.trx
+*.coverage
+
+# Ignore tool-specific files (e.g., JetBrains Rider)
+.idea/
