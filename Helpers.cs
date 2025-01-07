@@ -2,13 +2,30 @@
 
 public class Helpers
 {
-    /// <summary>
-    /// Checks if a string contains only capital letters and spaces.
-    /// </summary>
-    /// <param name="input">The string to check.</param>
-    /// <returns>True if the string contains only capital letters and spaces; otherwise, false.</returns>
-    public static bool ContainsOnlyCapitalsAndSpaces(string input)
+    public static bool IsAveMania(string input)
     {
-        return input.All(c => char.IsUpper(c) || c == ' ' || c == '\'');
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return false;
+        }
+        if (input.Length < 3)
+        {
+            return false;
+        }
+        return input.All(c => char.IsUpper(c) || c == ' ' || c == '\'' || c == '-');
+    }
+
+    public static DateTime ConvertTimestampToDateTime(long timestamp)
+    {
+        return DateTimeOffset.FromUnixTimeSeconds(timestamp).DateTime;
+    }
+
+    public static string GetArgument(string messageText)
+    {
+        if (string.IsNullOrWhiteSpace(messageText) || !messageText.Contains(' '))
+        {
+            return string.Empty;
+        }
+        return messageText.Substring(messageText.IndexOf(' ') + 1);
     }
 }

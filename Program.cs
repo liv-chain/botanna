@@ -3,12 +3,13 @@ using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using File = System.IO.File;
 
 class Program
 {
     static async Task Main(string[] args)
     {
-        string botToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw"; 
+        string botToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw";
         var botClient = new TelegramBotClient(botToken);
 
         // Start receiving updates
@@ -31,7 +32,8 @@ class Program
         await cts.CancelAsync(); // Stop the bot when the program exits
     }
 
-    private static async Task HandleUpdate(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+    private static async Task HandleUpdate(ITelegramBotClient botClient, Update update,
+        CancellationToken cancellationToken)
     {
         if (update.Message is not { } message || message.Text is not { } messageText)
             return;
@@ -39,7 +41,7 @@ class Program
         var chatId = message.Chat.Id;
         var chatType = message.Chat.Type;
         string senderName = message.From?.FirstName ?? message.From?.Username ?? "Someone";
-        
+
         // Check if the message is from a group
         if (chatType == ChatType.Group || chatType == ChatType.Supergroup)
         {
@@ -50,28 +52,26 @@ class Program
             await HandlePrivateMessage(botClient, cancellationToken, chatId, messageText);
         }
     }
-    
+
     private static async Task HandleGroupMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
         long chatId, string senderName, string messageText)
     {
-
-        if (Helpers.ContainsOnlyCapitalsAndSpaces(messageText))
+        if (Helpers.IsAveMania(messageText))
         {
             DbRepo repo = new DbRepo();
-            
             int? entryId = repo.Check(messageText);
-
-            if (entryId is not null)
+            if (entryId > 0)
             {
-                AveMania am = repo.Find(entryId.Value);
+                AveMania? am = repo.Find(entryId.Value);
                 await botClient.SendMessage(
                     chatId: chatId,
-                    text: $"MULTA per {senderName}! {messageText} era già stato scritto da {am.Author} il {am.DateTime:dd/MM/yyyy}",
+                    text: $"MULTA per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy}",
                     cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             else
             {
-                repo.Add(new AveMania(messageText, senderName, DateTime.Now));
+                long unixTimestamp = new DateTimeOffset(DateTime.Now).ToUnixTimeSeconds();
+                repo.Add(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now));
             }
         }
     }
@@ -86,37 +86,123 @@ class Program
     private static async Task HandlePrivateMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
         long chatId, string messageText)
     {
-        if (messageText.ToLower() == "/init")
+        try
+        {
+            if (messageText.ToLower().StartsWith("/s"))
+            {
+                await SearchResults(botClient, cancellationToken, chatId, messageText);
+                return;
+            }
+
+            switch (messageText.ToLower())
+            {
+                case "/init":
+                {
+                    // DbRepo repo = new DbRepo();
+                    // repo.InitDataBase();
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: $"Db inizializzato con successo!",
+                        cancellationToken: cancellationToken);
+                    break;
+                }
+                case "/db":
+                {
+                    await SendDatabaseFile(botClient, cancellationToken, chatId); 
+                    break;
+                }
+                default:
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: "Comandi disponibili:\n" +
+                              "/s - Cerca le avemanie - utile per evitare le multe\n" +
+                              "/c - Conta le avemanie\n" +
+                              "/h - Mostra questo messaggio\n" +
+                              "/db - Scarica il db",
+                        cancellationToken: cancellationToken);
+                    break;
+            }
+        }
+        catch (Exception e)
+        {
+            await botClient.SendMessage(
+                chatId: chatId,
+                text: e.Message,
+                cancellationToken: cancellationToken);
+        }
+    }
+
+
+    private static async Task SendDatabaseFile(ITelegramBotClient botClient, CancellationToken cancellationToken,
+        long chatId)
+    {
+        try
+        {
+            string dbFilePath = "./ave_mania.db"; 
+            if (File.Exists(dbFilePath))
+            {
+                using var stream = new FileStream(dbFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                await botClient.SendDocument(
+                    chatId: chatId,
+                    document: new InputFileStream(stream, "database.db"),
+                    caption: "Here is the SQLite database file.",
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text: "Database file not found. Ensure the database path is correct!",
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await botClient.SendMessage(
+                chatId: chatId,
+                text: $"An error occurred while sending the database: {ex.Message}",
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task SearchResults(ITelegramBotClient botClient, CancellationToken cancellationToken,
+        long chatId,
+        string messageText)
+    {
+        string am = Helpers.GetArgument(messageText);
+        if (Helpers.IsAveMania(am.ToUpper()))
         {
             DbRepo repo = new DbRepo();
-            try
+            var argument = Helpers.GetArgument(messageText);
+            List<AveMania> results = repo.FindMessagesContaining(argument.ToUpper());
+            if (results.Count > 0)
             {
-                repo.Init();
+                string text = string.Join("\n", results.Select(x => x.ToString()));
                 await botClient.SendMessage(
                     chatId: chatId,
-                    text: $"Db inizializzato con successo!",
+                    text: "Trovate le seguenti avemanie\n" + text,
                     cancellationToken: cancellationToken);
-
             }
-            catch (Exception e)
+            else
             {
                 await botClient.SendMessage(
                     chatId: chatId,
-                    text: $"Errore: {e.Message}",
+                    text: "Vai che non è multa",
                     cancellationToken: cancellationToken);
             }
         }
         else
         {
-
             await botClient.SendMessage(
                 chatId: chatId,
-                text: $"Vai scrivere \"{messageText}\" su tua zia, demente",
+                text:
+                "Che cazzo stai blaterando, non hai scritto un'avemania. Scrivi /s PAROLA per cercare tutte le avemanie che contengono PAROLA",
                 cancellationToken: cancellationToken);
         }
     }
 
-    private static Task HandleError(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+    private static Task HandleError(ITelegramBotClient botClient, Exception exception,
+        CancellationToken cancellationToken)
     {
         Console.WriteLine($"Error: {exception.Message}");
         return Task.CompletedTask;
