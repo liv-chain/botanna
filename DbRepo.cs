@@ -179,4 +179,17 @@ public class DbRepo
             }
         }
     }
+
+    public long Count()
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            using (var command = new SQLiteCommand(CountQuery, connection))
+            {
+                var result = command.ExecuteScalar();
+                return result != null ? Convert.ToInt64(result) : 0;
+            }
+        }
+    }
 }

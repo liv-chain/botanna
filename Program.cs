@@ -106,6 +106,16 @@ class Program
                         cancellationToken: cancellationToken);
                     break;
                 }
+                case "/c":
+                {
+                    DbRepo repo = new DbRepo();
+                    long count = repo.Count();
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: $"Sono state scritte {count} avemanie",
+                        cancellationToken: cancellationToken);
+                    break;
+                }
                 case "/db":
                 {
                     await SendDatabaseFile(botClient, cancellationToken, chatId); 
