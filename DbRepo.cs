@@ -43,22 +43,28 @@ public class DbRepo
         foreach (ChatData data in chatData)
         {
             Console.WriteLine($"File {i++} of {chatData.Count} - {data.messages.Count} to be imported");
-            foreach (var messages in data.messages)
+            foreach (var mess in data.messages)
             {
-                if (Helpers.IsAveMania(messages.content))
+                if (mess.content != null && !mess.content.Any(c => c != null && c > 127))
                 {
-                    AveMania aveMania = new(messages.content, messages.sender_name, messages.timestamp_ms,
+                    Console.WriteLine($"Skipping message {mess.content} (does not contains accented characters)");
+                    continue;
+                }
+
+                if (Helpers.IsAveMania(mess.content))
+                {
+                    AveMania aveMania = new(mess.content, mess.sender_name, mess.timestamp_ms,
                         DateTime.Now);
                     using var command = new SQLiteCommand(InsertQuery, connection);
                     command.Parameters.AddWithValue("@message", aveMania.Message);
                     command.Parameters.AddWithValue("@author", aveMania.Author);
                     command.Parameters.AddWithValue("@datetime", DateTime.Now);
                     command.ExecuteNonQuery();
-                    Console.WriteLine($"Message {messages.content} added");
+                    Console.WriteLine($"Message {mess.content} added");
                 }
                 else
                 {
-                    Console.WriteLine($"Skipping message {messages.content}");
+                    Console.WriteLine($"Skipping message {mess.content}");
                 }
             }
         }
@@ -189,6 +195,29 @@ public class DbRepo
             {
                 var result = command.ExecuteScalar();
                 return result != null ? Convert.ToInt64(result) : 0;
+            }
+        }
+    }
+
+    public void DeleteDupicates()
+    {
+        
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            
+            // Deleting duplicate rows while keeping the one with the smallest id
+            string deleteDuplicatesQuery = $@"
+                DELETE FROM {TableName}
+                WHERE id NOT IN (
+                    SELECT MIN(id)
+                    FROM {TableName}
+                    GROUP BY message
+                )";
+            
+            using (var command = new SQLiteCommand(deleteDuplicatesQuery, connection))
+            {
+                command.ExecuteNonQuery();
             }
         }
     }

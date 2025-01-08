@@ -12,7 +12,7 @@ public class Helpers
         {
             return false;
         }
-        return input.All(c => char.IsUpper(c) || c == ' ' || c == '\'' || c == '-');
+        return input.All(c => char.IsUpper(c) || c == ' ' || c == '\'' || c == '-' || !char.IsLetter(c));
     }
 
     public static DateTime ConvertTimestampToDateTime(long timestamp)

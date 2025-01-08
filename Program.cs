@@ -1,4 +1,5 @@
-﻿using AveManiaBot;
+﻿using System.Diagnostics.CodeAnalysis;
+using AveManiaBot;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -62,11 +63,7 @@ class Program
             int? entryId = repo.Check(messageText);
             if (entryId > 0)
             {
-                AveMania? am = repo.Find(entryId.Value);
-                await botClient.SendMessage(
-                    chatId: chatId,
-                    text: $"MULTA per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy}",
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                await SendMultaMessage(botClient, cancellationToken, chatId, senderName, messageText, repo, entryId);
             }
             else
             {
@@ -74,6 +71,16 @@ class Program
                 repo.Add(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now));
             }
         }
+    }
+
+    private static async Task SendMultaMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
+        long chatId, string senderName, string messageText, DbRepo repo, [DisallowNull] int? entryId)
+    {
+        AveMania? am = repo.Find(entryId.Value);
+        await botClient.SendMessage(
+            chatId: chatId,
+            text: $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f",
+            cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -98,21 +105,27 @@ class Program
             {
                 case "/init":
                 {
-                    // DbRepo repo = new DbRepo();
-                    // repo.InitDataBase();
+                    new DbRepo().InitDataBase();
                     await botClient.SendMessage(
                         chatId: chatId,
                         text: $"Db inizializzato con successo!",
                         cancellationToken: cancellationToken);
                     break;
                 }
-                case "/c":
-                {
-                    DbRepo repo = new DbRepo();
-                    long count = repo.Count();
+                case "/dp":
+                    new DbRepo().DeleteDupicates();
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: $"Sono state scritte {count} avemanie",
+                        text: $"Duplicati eliminati con successo!",
+                        cancellationToken: cancellationToken);
+                    break;
+
+                case "/c":
+                {
+                    var count = new DbRepo().Count();
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: $"Sono state scritte {count} avemanie \ud83d\ude0a",
                         cancellationToken: cancellationToken);
                     break;
                 }
@@ -125,7 +138,7 @@ class Program
                     await botClient.SendMessage(
                         chatId: chatId,
                         text: "Comandi disponibili:\n" +
-                              "/s - Cerca le avemanie - utile per evitare le multe\n" +
+                              "/s AVEMANIA - Cerca le avemanie - utile per evitare le multe\n" +
                               "/c - Conta le avemanie\n" +
                               "/h - Mostra questo messaggio\n" +
                               "/db - Scarica il db",
@@ -190,7 +203,7 @@ class Program
                 string text = string.Join("\n", results.Select(x => x.ToString()));
                 await botClient.SendMessage(
                     chatId: chatId,
-                    text: "Trovate le seguenti avemanie\n" + text,
+                    text: "Guarda un po' qua cosa ho trovato\n" + text,
                     cancellationToken: cancellationToken);
             }
             else
