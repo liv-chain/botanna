@@ -45,11 +45,11 @@ public class DbRepo
             Console.WriteLine($"File {i++} of {chatData.Count} - {data.messages.Count} to be imported");
             foreach (var mess in data.messages)
             {
-                if (mess.content != null && !mess.content.Any(c => c != null && c > 127))
-                {
-                    Console.WriteLine($"Skipping message {mess.content} (does not contains accented characters)");
-                    continue;
-                }
+                // if (mess.content != null && !mess.content.Any(c => c != null && c > 127))
+                // {
+                //     Console.WriteLine($"Skipping message {mess.content} (does not contains accented characters)");
+                //     continue;
+                // }
 
                 if (Helpers.IsAveMania(mess.content))
                 {
@@ -201,24 +201,122 @@ public class DbRepo
 
     public void DeleteDupicates()
     {
-        
         using (var connection = new SQLiteConnection(ConnectionString))
         {
             connection.Open();
-            
+
             // Deleting duplicate rows while keeping the one with the smallest id
             string deleteDuplicatesQuery = $@"
                 DELETE FROM {TableName}
                 WHERE id NOT IN (
-                    SELECT MIN(id)
+                    SELECT MAX(id)
                     FROM {TableName}
                     GROUP BY message
                 )";
-            
+
             using (var command = new SQLiteCommand(deleteDuplicatesQuery, connection))
             {
                 command.ExecuteNonQuery();
             }
         }
+    }
+
+
+    public List<AveMania> GetRandom(int n)
+    {
+        var randomAveManias = new List<AveMania>();
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+
+            string query = $@"
+            SELECT * FROM {TableName}
+            ORDER BY RANDOM()
+            LIMIT @limit";
+
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                command.Parameters.AddWithValue("@limit", n);
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        DateTime.TryParse(reader["datetime"].ToString(), out var dateTime);
+                        randomAveManias.Add(new AveMania(
+                            reader["message"].ToString() ?? string.Empty,
+                            reader["author"].ToString() ?? string.Empty,
+                            0,
+                            dateTime
+                        ));
+                    }
+                }
+            }
+        }
+
+        return randomAveManias;
+    }
+
+    public Dictionary<string, int> GetDaysSinceLastMessageForAllAuthors()
+    {
+        Dictionary<string, int> daysSinceLastMessages = new Dictionary<string, int>();
+
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+
+            string query = $@"
+            SELECT author, MAX(datetime) AS lastMessageDate 
+            FROM {TableName} 
+            GROUP BY author";
+
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        if (DateTime.TryParse(reader["lastMessageDate"].ToString(), out var lastMessageDate))
+                        {
+                            int daysSinceLastMessage = (DateTime.Now - lastMessageDate).Days;
+                            string author = reader["author"].ToString() ?? string.Empty;
+                            daysSinceLastMessages[author] = daysSinceLastMessage;
+                        }
+                    }
+                }
+            }
+        }
+
+        return daysSinceLastMessages;
+    }
+
+    public List<AveMania> GetLast(int i)
+    {
+        var results = new List<AveMania>();
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            string query = $@"SELECT * FROM {TableName} WHERE datetime >= @fromTime ORDER BY datetime DESC";
+
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                DateTime fromTime = DateTime.Now.AddHours(-i);
+                command.Parameters.AddWithValue("@fromTime", fromTime);
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        DateTime.TryParse(reader["datetime"].ToString(), out var dateTime);
+                        results.Add(new AveMania(
+                            reader["message"].ToString() ?? string.Empty,
+                            reader["author"].ToString() ?? string.Empty,
+                            0,
+                            dateTime
+                        ));
+                    }
+                }
+            }
+        }
+
+        return results;
     }
 }

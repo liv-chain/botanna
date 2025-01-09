@@ -33,6 +33,13 @@ class Program
         await cts.CancelAsync(); // Stop the bot when the program exits
     }
 
+    /// <summary>
+    /// Handles incoming updates from the Telegram API, processes messages based on their chat type, and delegates them to the appropriate handling methods.
+    /// </summary>
+    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
+    /// <param name="update">The incoming update object containing information about the event (e.g., messages, commands) received by the bot.</param>
+    /// <param name="cancellationToken">Propagates notification that the operation should be canceled.</param>
+    /// <returns>A task representing the asynchronous operation of processing the update.</returns>
     private static async Task HandleUpdate(ITelegramBotClient botClient, Update update,
         CancellationToken cancellationToken)
     {
@@ -54,6 +61,15 @@ class Program
         }
     }
 
+    /// <summary>
+    /// Handles incoming group messages, determines if they match specific criteria, and processes them accordingly by checking for duplicates or saving new messages.
+    /// </summary>
+    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
+    /// <param name="cancellationToken">Propagates notification that the operation should be canceled.</param>
+    /// <param name="chatId">The unique identifier of the group chat where the message was received.</param>
+    /// <param name="senderName">The name of the user who sent the message in the group.</param>
+    /// <param name="messageText">The text of the message received in the group.</param>
+    /// <returns>A task representing the asynchronous operation of processing the group message.</returns>
     private static async Task HandleGroupMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
         long chatId, string senderName, string messageText)
     {
@@ -73,6 +89,17 @@ class Program
         }
     }
 
+    /// <summary>
+    /// Sends a notification message to the chat when a duplicate message is detected, indicating the original author and timestamp.
+    /// </summary>
+    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
+    /// <param name="cancellationToken">Propagates notification that the operation should be canceled.</param>
+    /// <param name="chatId">The unique identifier of the chat where the message needs to be sent.</param>
+    /// <param name="senderName">The name of the user who sent the duplicate message.</param>
+    /// <param name="messageText">The text of the duplicate message.</param>
+    /// <param name="repo">The database repository used to retrieve information about stored messages.</param>
+    /// <param name="entryId">The identifier of the original message entry in the database.</param>
+    /// <returns>A task representing the asynchronous operation of sending the notification message.</returns>
     private static async Task SendMultaMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
         long chatId, string senderName, string messageText, DbRepo repo, [DisallowNull] int? entryId)
     {
@@ -84,12 +111,13 @@ class Program
     }
 
     /// <summary>
-    /// 
+    /// Handles private messages sent to the bot, parses the message text, and performs operations based on specific commands.
     /// </summary>
-    /// <param name="botClient"></param>
-    /// <param name="cancellationToken"></param>
-    /// <param name="chatId"></param>
-    /// <param name="messageText"></param>
+    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
+    /// <param name="cancellationToken">Propagates notification that operations should be canceled.</param>
+    /// <param name="chatId">The unique identifier of the chat where the message originates.</param>
+    /// <param name="messageText">The text of the private message received by the bot.</param>
+    /// <returns>A task that represents the asynchronous operation of processing the private message.</returns>
     private static async Task HandlePrivateMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
         long chatId, string messageText)
     {
@@ -98,6 +126,17 @@ class Program
             if (messageText.ToLower().StartsWith("/s"))
             {
                 await SearchResults(botClient, cancellationToken, chatId, messageText);
+                return;
+            }
+            
+            if (messageText.ToLower().StartsWith("/add"))
+            {
+                messageText = messageText.Replace("/add", "");
+                new DbRepo().Add(new AveMania(messageText.TrimStart(), "Someone", 0, DateTime.Now));
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text: $"Avemania aggiunta!",
+                    cancellationToken: cancellationToken);
                 return;
             }
 
@@ -111,7 +150,7 @@ class Program
                         text: $"Db inizializzato con successo!",
                         cancellationToken: cancellationToken);
                     break;
-                }
+                }      
                 case "/dp":
                     new DbRepo().DeleteDupicates();
                     await botClient.SendMessage(
@@ -119,7 +158,6 @@ class Program
                         text: $"Duplicati eliminati con successo!",
                         cancellationToken: cancellationToken);
                     break;
-
                 case "/c":
                 {
                     var count = new DbRepo().Count();
@@ -129,9 +167,60 @@ class Program
                         cancellationToken: cancellationToken);
                     break;
                 }
+                case "/act": 
+                {
+                    var daysForAuthor = new DbRepo().GetDaysSinceLastMessageForAllAuthors();
+
+                    string GetDesc(string current, KeyValuePair<string, int> author)
+                    {
+                        string authorName = string.IsNullOrEmpty(author.Key) ? "Sconosciuto" : author.Key;
+                        return current + $"{authorName} ha scritto l'ultima avemania il {author.Value} giorni fa\n";
+                    }
+
+                    string text = daysForAuthor.Aggregate(string.Empty, GetDesc);
+                    
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text,
+                        cancellationToken: cancellationToken);
+                    break;
+                }
+                case "/r":
+                {
+                    var r = new DbRepo().GetRandom(3);
+                    string text = string.Join("\n", r.Select(x => x.ToString()));
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: "Ecco 3 avemanie per te. Spero ti vadano di traverso. \n" + text,
+                        cancellationToken: cancellationToken);
+                    break;
+                }
                 case "/db":
                 {
                     await SendDatabaseFile(botClient, cancellationToken, chatId); 
+                    break;
+                }
+                case "/d":
+                {
+                    DbRepo repo = new DbRepo();
+                    var argument = Helpers.GetArgument(messageText);
+                    List<AveMania> results = repo.GetLast(24);
+                    if (results.Count > 0)
+                    {
+                        string text = string.Join("\n", results.Select(x => x.ToString()));
+                        await botClient.SendMessage(
+                            chatId: chatId,
+                            text: "Guarda un po' qua cosa ho trovato\n" + text,
+                            cancellationToken: cancellationToken);
+                    }
+                    else
+                    {
+                        await botClient.SendMessage(
+                            chatId: chatId,
+                            text: "Nessuno ha scritto un cazzo",
+                            cancellationToken: cancellationToken);
+                    }
+  
                     break;
                 }
                 default:
@@ -140,7 +229,10 @@ class Program
                         text: "Comandi disponibili:\n" +
                               "/s AVEMANIA - Cerca le avemanie - utile per evitare le multe\n" +
                               "/c - Conta le avemanie\n" +
+                              "/d - Mostra le avemanie delle ultime 24 ore\n" +
                               "/h - Mostra questo messaggio\n" +
+                              "/r - Restituisce 3 avemanie a caso\n" +
+                              "/act - Dati sull'attività dei partecipanti\n" +
                               "/db - Scarica il db",
                         cancellationToken: cancellationToken);
                     break;
