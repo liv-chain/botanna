@@ -6,6 +6,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using File = System.IO.File;
 
+// ReSharper disable once CheckNamespace
 class Program
 {
     static async Task Main(string[] args)
@@ -49,7 +50,21 @@ class Program
         var chatId = message.Chat.Id;
         var chatType = message.Chat.Type;
         string senderName = message.From?.FirstName ?? message.From?.Username ?? "Someone";
-
+        
+        // Check if the update is about a new member being added to the group
+        // if (update.Message?.NewChatMembers?.Any() ?? false)
+        // {
+        //     foreach (var newMember in update.Message.NewChatMembers)
+        //     {
+        //         string newMemberName = newMember.FirstName ?? newMember.Username ?? "A new member";
+        //         await botClient.SendMessage(
+        //             chatId: chatId,
+        //             text: $"Welcome {newMemberName} to the group!",
+        //             cancellationToken: cancellationToken);
+        //     }
+        //     return;
+        // }
+        
         // Check if the message is from a group
         if (chatType == ChatType.Group || chatType == ChatType.Supergroup)
         {
@@ -79,7 +94,10 @@ class Program
             int? entryId = repo.Check(messageText);
             if (entryId > 0)
             {
-                await SendMultaMessage(botClient, cancellationToken, chatId, senderName, messageText, repo, entryId);
+                var text = await SendPenaltyMessage(botClient, cancellationToken, chatId, senderName, messageText, repo,
+                    entryId);
+                
+                repo.Add(new Penalty(text, senderName, 0, DateTime.Now));
             }
             else
             {
@@ -87,27 +105,6 @@ class Program
                 repo.Add(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now));
             }
         }
-    }
-
-    /// <summary>
-    /// Sends a notification message to the chat when a duplicate message is detected, indicating the original author and timestamp.
-    /// </summary>
-    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
-    /// <param name="cancellationToken">Propagates notification that the operation should be canceled.</param>
-    /// <param name="chatId">The unique identifier of the chat where the message needs to be sent.</param>
-    /// <param name="senderName">The name of the user who sent the duplicate message.</param>
-    /// <param name="messageText">The text of the duplicate message.</param>
-    /// <param name="repo">The database repository used to retrieve information about stored messages.</param>
-    /// <param name="entryId">The identifier of the original message entry in the database.</param>
-    /// <returns>A task representing the asynchronous operation of sending the notification message.</returns>
-    private static async Task SendMultaMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
-        long chatId, string senderName, string messageText, DbRepo repo, [DisallowNull] int? entryId)
-    {
-        AveMania? am = repo.Find(entryId.Value);
-        await botClient.SendMessage(
-            chatId: chatId,
-            text: $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f",
-            cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -128,14 +125,14 @@ class Program
                 await SearchResults(botClient, cancellationToken, chatId, messageText);
                 return;
             }
-            
+
             if (messageText.ToLower().StartsWith("/add"))
             {
                 messageText = messageText.Replace("/add", "");
                 new DbRepo().Add(new AveMania(messageText.TrimStart(), "Someone", 0, DateTime.Now));
                 await botClient.SendMessage(
                     chatId: chatId,
-                    text: $"Avemania aggiunta!",
+                    text: "Avemania aggiunta!",
                     cancellationToken: cancellationToken);
                 return;
             }
@@ -144,18 +141,18 @@ class Program
             {
                 case "/init":
                 {
-                    new DbRepo().InitDataBase();
+                    new DbRepo().InitDataBase(false);
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: $"Db inizializzato con successo!",
+                        text: "Db inizializzato con successo!",
                         cancellationToken: cancellationToken);
                     break;
-                }      
+                }
                 case "/dp":
-                    new DbRepo().DeleteDupicates();
+                    new DbRepo().DeleteDuplicates();
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: $"Duplicati eliminati con successo!",
+                        text: "Duplicati eliminati con successo!",
                         cancellationToken: cancellationToken);
                     break;
                 case "/c":
@@ -167,22 +164,14 @@ class Program
                         cancellationToken: cancellationToken);
                     break;
                 }
-                case "/act": 
+                case "/act":
                 {
-                    var daysForAuthor = new DbRepo().GetDaysSinceLastMessageForAllAuthors();
-
-                    string GetDesc(string current, KeyValuePair<string, int> author)
-                    {
-                        string authorName = string.IsNullOrEmpty(author.Key) ? "Sconosciuto" : author.Key;
-                        return current + $"{authorName} ha scritto l'ultima avemania il {author.Value} giorni fa\n";
-                    }
-
-                    string text = daysForAuthor.Aggregate(string.Empty, GetDesc);
-                    
-                    await botClient.SendMessage(
-                        chatId: chatId,
-                        text,
-                        cancellationToken: cancellationToken);
+                    await ShowActivity(botClient, cancellationToken, chatId);
+                    break;
+                }
+                case "/p":
+                {
+                    await ShowPenalties(botClient, cancellationToken, chatId);
                     break;
                 }
                 case "/r":
@@ -197,13 +186,12 @@ class Program
                 }
                 case "/db":
                 {
-                    await SendDatabaseFile(botClient, cancellationToken, chatId); 
+                    await SendDatabaseFile(botClient, cancellationToken, chatId);
                     break;
                 }
                 case "/d":
                 {
                     DbRepo repo = new DbRepo();
-                    var argument = Helpers.GetArgument(messageText);
                     List<AveMania> results = repo.GetLast(24);
                     if (results.Count > 0)
                     {
@@ -220,15 +208,17 @@ class Program
                             text: "Nessuno ha scritto un cazzo",
                             cancellationToken: cancellationToken);
                     }
-  
+
                     break;
                 }
+
                 default:
                     await botClient.SendMessage(
                         chatId: chatId,
                         text: "Comandi disponibili:\n" +
                               "/s AVEMANIA - Cerca le avemanie - utile per evitare le multe\n" +
                               "/c - Conta le avemanie\n" +
+                              "/p - Mostra i dati sulle multe\n" +
                               "/d - Mostra le avemanie delle ultime 24 ore\n" +
                               "/h - Mostra questo messaggio\n" +
                               "/r - Restituisce 3 avemanie a caso\n" +
@@ -247,13 +237,79 @@ class Program
         }
     }
 
+    private static async Task ShowPenalties(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
+    {
+        var penaltiesForAuthor = new DbRepo().GetPenaltiesForAllAuthors();
+
+        string GetDesc(string current, KeyValuePair<string, int> author)
+        {
+            string authorName = string.IsNullOrEmpty(author.Key) ? "Sconosciuto" : author.Key;
+            return current + $"{authorName} ha preso {author.Value} multe\n";
+        }
+        
+        string text = penaltiesForAuthor.Aggregate(string.Empty, GetDesc);
+
+        await botClient.SendMessage(
+            chatId: chatId,
+            text,
+            cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends a notification message to the chat when a duplicate message is detected, indicating the original author and timestamp.
+    /// </summary>
+    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
+    /// <param name="cancellationToken">Propagates notification that the operation should be canceled.</param>
+    /// <param name="chatId">The unique identifier of the chat where the message needs to be sent.</param>
+    /// <param name="senderName">The name of the user who sent the duplicate message.</param>
+    /// <param name="messageText">The text of the duplicate message.</param>
+    /// <param name="repo">The database repository used to retrieve information about stored messages.</param>
+    /// <param name="entryId">The identifier of the original message entry in the database.</param>
+    /// <returns>A task representing the asynchronous operation of sending the notification message.</returns>
+    private static async Task<string> SendPenaltyMessage(ITelegramBotClient botClient,
+        CancellationToken cancellationToken,
+        long chatId, string senderName, string messageText, DbRepo repo, [DisallowNull] int? entryId)
+    {
+       
+        AveMania? am = repo.Find(entryId.Value);
+
+        string text =
+            $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f";
+
+        await botClient.SendMessage(
+            chatId: chatId,
+            text,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+
+        return text;
+    }
+
+    private static async Task ShowActivity(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
+    {
+        var daysForAuthor = new DbRepo().GetDaysSinceLastMessageForAllAuthors();
+
+        string GetDesc(string current, KeyValuePair<string, int> author)
+        {
+            string authorName = string.IsNullOrEmpty(author.Key) ? "Sconosciuto" : author.Key;
+            return current + $"{authorName} ha scritto l'ultima avemania il {author.Value} giorni fa\n";
+        }
+
+        string text = daysForAuthor.Aggregate(string.Empty, GetDesc);
+
+        await botClient.SendMessage(
+            chatId: chatId,
+            text,
+            cancellationToken: cancellationToken);
+    }
+
 
     private static async Task SendDatabaseFile(ITelegramBotClient botClient, CancellationToken cancellationToken,
         long chatId)
     {
         try
         {
-            string dbFilePath = "./ave_mania.db"; 
+            string dbFilePath = "./ave_mania.db";
             if (File.Exists(dbFilePath))
             {
                 using var stream = new FileStream(dbFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);

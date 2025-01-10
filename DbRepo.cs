@@ -7,20 +7,27 @@ public class DbRepo
 {
     private const string DbPath = "ave_mania.db";
     private const string ConnectionString = $"Data Source={DbPath};Version=3;";
-    private const string TableName = "ave_mania";
+    private const string AmTableName = "ave_mania";
+    private const string PenaltyTableName = "penalties";
 
     private const string CreateTableQuery =
-        $"CREATE TABLE IF NOT EXISTS {TableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
+        $"CREATE TABLE IF NOT EXISTS {AmTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
+
+    private const string CreatePenaltyTableQuery =
+        $"CREATE TABLE IF NOT EXISTS {PenaltyTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
 
     private const string InsertQuery =
-        $"INSERT INTO {TableName} (message, author, datetime) VALUES (@message, @author, @datetime)";
+        $"INSERT INTO {AmTableName} (message, author, datetime) VALUES (@message, @author, @datetime)";
 
-    private const string SelectQuery = $"SELECT * FROM {TableName}";
-    private const string CountQuery = $"SELECT COUNT(*) FROM {TableName}";
-    private const string SelectWhereQuery = $"SELECT * FROM {TableName} WHERE message = @message";
-    private const string SelectWhereIdQuery = $"SELECT * FROM {TableName} WHERE id = @id";
+    private const string InsertPenaltyQuery =
+        $"INSERT INTO {PenaltyTableName} (message, author, datetime) VALUES (@message, @author, @datetime)";
 
-    public void InitDataBase()
+    private const string SelectQuery = $"SELECT * FROM {AmTableName}";
+    private const string CountQuery = $"SELECT COUNT(*) FROM {AmTableName}";
+    private const string SelectWhereQuery = $"SELECT * FROM {AmTableName} WHERE message = @message";
+    private const string SelectWhereIdQuery = $"SELECT * FROM {AmTableName} WHERE id = @id";
+
+    public void InitDataBase(bool initData)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -30,6 +37,17 @@ public class DbRepo
                 command.ExecuteNonQuery();
             }
 
+            using (var command = new SQLiteCommand(CreatePenaltyTableQuery, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+
+            if (!initData)
+            {
+                return;
+            }
+
+            Console.WriteLine("Importing data...");
             List<ChatData> chatData = LoadChatDataFromJsonFiles();
             ImportChatData(chatData, connection);
         }
@@ -112,7 +130,7 @@ public class DbRepo
         List<AveMania> results = new();
         using var connection = new SQLiteConnection(ConnectionString);
         connection.Open();
-        string query = $"SELECT * FROM {TableName} WHERE message LIKE '%' || @searchText || '%'";
+        string query = $"SELECT * FROM {AmTableName} WHERE message LIKE '%' || @searchText || '%'";
         using var command = new SQLiteCommand(query, connection);
         command.Parameters.AddWithValue("@searchText", searchText);
         using SQLiteDataReader? reader = command.ExecuteReader();
@@ -186,6 +204,21 @@ public class DbRepo
         }
     }
 
+    public void Add(Penalty penalty)
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            using (var command = new SQLiteCommand(InsertPenaltyQuery, connection))
+            {
+                command.Parameters.AddWithValue("@message", penalty.Message);
+                command.Parameters.AddWithValue("@author", penalty.Author);
+                command.Parameters.AddWithValue("@datetime", penalty.DateTime);
+                command.ExecuteNonQuery();
+            }
+        }
+    }
+
     public long Count()
     {
         using (var connection = new SQLiteConnection(ConnectionString))
@@ -199,7 +232,7 @@ public class DbRepo
         }
     }
 
-    public void DeleteDupicates()
+    public void DeleteDuplicates()
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -207,10 +240,10 @@ public class DbRepo
 
             // Deleting duplicate rows while keeping the one with the smallest id
             string deleteDuplicatesQuery = $@"
-                DELETE FROM {TableName}
+                DELETE FROM {AmTableName}
                 WHERE id NOT IN (
                     SELECT MAX(id)
-                    FROM {TableName}
+                    FROM {AmTableName}
                     GROUP BY message
                 )";
 
@@ -230,7 +263,7 @@ public class DbRepo
             connection.Open();
 
             string query = $@"
-            SELECT * FROM {TableName}
+            SELECT * FROM {AmTableName}
             ORDER BY RANDOM()
             LIMIT @limit";
 
@@ -266,7 +299,7 @@ public class DbRepo
 
             string query = $@"
             SELECT author, MAX(datetime) AS lastMessageDate 
-            FROM {TableName} 
+            FROM {AmTableName} 
             GROUP BY author";
 
             using (var command = new SQLiteCommand(query, connection))
@@ -295,7 +328,7 @@ public class DbRepo
         using (var connection = new SQLiteConnection(ConnectionString))
         {
             connection.Open();
-            string query = $@"SELECT * FROM {TableName} WHERE datetime >= @fromTime ORDER BY datetime DESC";
+            string query = $@"SELECT * FROM {AmTableName} WHERE datetime >= @fromTime ORDER BY datetime DESC";
 
             using (var command = new SQLiteCommand(query, connection))
             {
@@ -318,5 +351,34 @@ public class DbRepo
         }
 
         return results;
+    }
+
+    public Dictionary<string, int> GetPenaltiesForAllAuthors()
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            string query = $@"
+            SELECT author, COUNT(*) AS penaltyCount
+            FROM {PenaltyTableName}
+            GROUP BY author";
+
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                using (var reader = command.ExecuteReader())
+                {
+                    var penalties = new Dictionary<string, int>();
+
+                    while (reader.Read())
+                    {
+                        string author = reader["author"].ToString() ?? string.Empty;
+                        int penaltyCount = Convert.ToInt32(reader["penaltyCount"]);
+                        penalties[author] = penaltyCount;
+                    }
+
+                    return penalties;
+                }
+            }
+        }
     }
 }

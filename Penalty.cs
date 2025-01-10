@@ -1,6 +1,6 @@
 ﻿namespace AveManiaBot;
 
-public record AveMania(string Message, string Author, long TimeStamp, DateTime DateTime)
+public record Penalty(string Message, string Author, long TimeStamp, DateTime DateTime)
 {
     public string Message { get; set; } = Message;
     public string Author { get; set; } = Author;
