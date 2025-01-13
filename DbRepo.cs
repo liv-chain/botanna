@@ -300,7 +300,7 @@ public class DbRepo
             string query = $@"
             SELECT author, MAX(datetime) AS lastMessageDate 
             FROM {AmTableName} 
-            GROUP BY author";
+            GROUP BY author order by MAX(datetime) asc";
 
             using (var command = new SQLiteCommand(query, connection))
             {
@@ -361,7 +361,7 @@ public class DbRepo
             string query = $@"
             SELECT author, COUNT(*) AS penaltyCount
             FROM {PenaltyTableName}
-            GROUP BY author";
+            GROUP BY author ORDER BY count(*) DESC";
 
             using (var command = new SQLiteCommand(query, connection))
             {

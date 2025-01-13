@@ -120,7 +120,7 @@ class Program
     {
         try
         {
-            if (messageText.ToLower().StartsWith("/s"))
+            if (messageText.ToLower().StartsWith("/s") && messageText != "/start")
             {
                 await SearchResults(botClient, cancellationToken, chatId, messageText);
                 return;

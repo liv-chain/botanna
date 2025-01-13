@@ -8,10 +8,17 @@ public class Helpers
         {
             return false;
         }
+
         if (input.Length < 3)
         {
             return false;
         }
+        
+        if (input.All(c => !char.IsLetter(c)))
+        {
+            return false;
+        }
+
         return input.All(c => char.IsUpper(c) || c == ' ' || c == '\'' || c == '-' || !char.IsLetter(c));
     }
 
@@ -26,6 +33,7 @@ public class Helpers
         {
             return string.Empty;
         }
+
         return messageText.Substring(messageText.IndexOf(' ') + 1);
     }
 }
