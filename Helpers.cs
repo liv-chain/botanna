@@ -21,12 +21,7 @@ public class Helpers
 
         return input.All(c => char.IsUpper(c) || c == ' ' || c == '\'' || c == '-' || !char.IsLetter(c));
     }
-
-    public static DateTime ConvertTimestampToDateTime(long timestamp)
-    {
-        return DateTimeOffset.FromUnixTimeSeconds(timestamp).DateTime;
-    }
-
+    
     public static string GetArgument(string messageText)
     {
         if (string.IsNullOrWhiteSpace(messageText) || !messageText.Contains(' '))

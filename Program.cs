@@ -1,10 +1,12 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using AveManiaBot;
+using Polly;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using File = System.IO.File;
+using Message = Telegram.Bot.Types.Message;
 
 // ReSharper disable once CheckNamespace
 class Program
@@ -26,16 +28,40 @@ class Program
             HandleError,
             receiverOptions,
             cancellationToken: cts.Token);
-
-        var me = await botClient.GetMe(cancellationToken: cts.Token);
-        Console.WriteLine($"Bot {me.Username} is up and running!");
+        
+        
+        try
+        {
+            var me = await botClient.GetMe(cancellationToken: cts.Token);
+            Console.WriteLine($"Bot {me.Username} is up and running!");
+        }
+        catch (Exception e)
+        {
+            var retryPolicy = Policy.Handle<Exception>()
+                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    (exception, timeSpan, retryCount, context) =>
+                    {
+                        Console.WriteLine(
+                            $"Retry {retryCount} for GetMe due to: {exception.Message}. Waiting {timeSpan.TotalSeconds} seconds before retrying...");
+                    });
+            try
+            {
+                var me = await retryPolicy.ExecuteAsync(() => botClient.GetMe(cancellationToken: cts.Token));
+                Console.WriteLine($"Bot {me.Username} is up and running!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to retrieve bot information: {ex.Message}");
+            }
+        }
 
         Console.ReadLine();
         await cts.CancelAsync(); // Stop the bot when the program exits
     }
 
     /// <summary>
-    /// Handles incoming updates from the Telegram API, processes messages based on their chat type, and delegates them to the appropriate handling methods.
+    /// Handles incoming updates from the Telegram API, processes messages based on their chat type,
+    /// and delegates them to the appropriate handling methods.
     /// </summary>
     /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
     /// <param name="update">The incoming update object containing information about the event (e.g., messages, commands) received by the bot.</param>
@@ -47,24 +73,27 @@ class Program
         if (update.Message is not { } message || message.Text is not { } messageText)
             return;
 
+        var ln = update.Message.From.LastName;
+        
+        await ProcessMessageBasedOnChatType(botClient, cancellationToken, message, messageText);
+    }
+
+    /// <summary>
+    /// Processes a message received by the bot and determines the appropriate action
+    /// based on the type of chat (group, supergroup, or private).
+    /// </summary>
+    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
+    /// <param name="cancellationToken">Token used to propagate notification that the operation should be canceled.</param>
+    /// <param name="message">The message object containing details of the received message.</param>
+    /// <param name="messageText">The text content of the received message.</param>
+    /// <returns>A task representing the asynchronous operation of handling the message based on its chat type.</returns>
+    private static async Task ProcessMessageBasedOnChatType(ITelegramBotClient botClient,
+        CancellationToken cancellationToken, Message message, string messageText)
+    {
         var chatId = message.Chat.Id;
         var chatType = message.Chat.Type;
-        string senderName = message.From?.FirstName ?? message.From?.Username ?? "Someone";
-        
-        // Check if the update is about a new member being added to the group
-        // if (update.Message?.NewChatMembers?.Any() ?? false)
-        // {
-        //     foreach (var newMember in update.Message.NewChatMembers)
-        //     {
-        //         string newMemberName = newMember.FirstName ?? newMember.Username ?? "A new member";
-        //         await botClient.SendMessage(
-        //             chatId: chatId,
-        //             text: $"Welcome {newMemberName} to the group!",
-        //             cancellationToken: cancellationToken);
-        //     }
-        //     return;
-        // }
-        
+        string senderName = message.From?.FirstName + " " + message.From?.LastName;
+
         // Check if the message is from a group
         if (chatType == ChatType.Group || chatType == ChatType.Supergroup)
         {
@@ -96,13 +125,61 @@ class Program
             {
                 var text = await SendPenaltyMessage(botClient, cancellationToken, chatId, senderName, messageText, repo,
                     entryId);
-                
+
                 repo.Add(new Penalty(text, senderName, 0, DateTime.Now));
             }
             else
             {
                 long unixTimestamp = new DateTimeOffset(DateTime.Now).ToUnixTimeSeconds();
                 repo.Add(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now));
+            }
+            
+            var exceeded = repo.HasAuthorExceededLimit(senderName);
+            if (exceeded)
+            {
+                List<string> remarks =
+                [
+                    "messo il turbo oggi, eh?",
+                    "sei un podcast vivente ma hai rotto il cazzo",
+                    "stai facendo il monologo finale di un film, o c’è una pausa da qualche parte?",
+                    "vuoi un microfono, o ti senti già abbastanza amplificato?",
+                    "sei già al capitolo 3 del tuo libro di puttanate?",
+                    "minchia oh, non c  i sei solo tu qua eh",
+                    "forse è il momento di passare la parola agli altri.",
+                    "vai a giocare con la merda nella tundra.",
+                    "mi piacerebbe sentire anche il punto di vista di qualcun altro di voi stronzetti.",
+                    "grazie per la tua passione, ma non hai un cazzo da fare oggi?",
+                    "puoi riassumere? Abbiamo poco tempo per leggere tutte le cagate che scrivi.",
+                    "hai coperto ogni dettaglio delle tue minchiate, possiamo passare al prossimo argomento?",
+                    "facciamo un break dalle minchiate, che dici?",
+                    "va bene, ho capito. Possiamo chiudere il discorso qui che hai scardinato lo scroto?",
+                    "ma smettila di fare il gazzabbubbo di turno, che qui non siamo al circo!",
+                    "se continui a parlare così, finisci dritto dritto nel manuale del perfetto spruzzafuffa.",
+                    "ma sei proprio un mestolone di gorgoglione oggi, eh?",
+                    "oh, gazzabbubbo ufficiale, la parola la passiamo anche agli altri o no?",
+                    "sembri un frastugliacazzi, vai avanti all’infinito!",
+                    "basta con questa manfrina da scatafasco ambulante!",
+                    "ma quanto hai bevuto dal calderone della logorrina oggi?"
+                ];
+                
+                static string GetRandomRemark(List<string> remarks)
+                {
+                    if (remarks == null || remarks.Count == 0)
+                    {
+                        throw new ArgumentException("La lista non può essere nulla o vuota.");
+                    }
+
+                    Random random = new Random();
+                    int index = random.Next(remarks.Count);
+                    return remarks[index];
+                }
+
+                string randomRemark = GetRandomRemark(remarks);
+                
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text: $"{senderName}, {randomRemark}",
+                    cancellationToken: cancellationToken);
             }
         }
     }
@@ -120,7 +197,7 @@ class Program
     {
         try
         {
-            if (messageText.ToLower().StartsWith("/s") && messageText != "/start")
+            if (messageText.ToLower().StartsWith("/s "))
             {
                 await SearchResults(botClient, cancellationToken, chatId, messageText);
                 return;
@@ -161,6 +238,15 @@ class Program
                     await botClient.SendMessage(
                         chatId: chatId,
                         text: $"Sono state scritte {count} avemanie \ud83d\ude0a",
+                        cancellationToken: cancellationToken);
+                    break;
+                }
+                case "/clr":
+                {
+                    var count = new DbRepo().ClearPenalties();
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: $"Sono state cancellate {count} avemanie \ud83d\ude0a",
                         cancellationToken: cancellationToken);
                     break;
                 }
@@ -237,7 +323,8 @@ class Program
         }
     }
 
-    private static async Task ShowPenalties(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
+    private static async Task ShowPenalties(ITelegramBotClient botClient, CancellationToken cancellationToken,
+        long chatId)
     {
         var penaltiesForAuthor = new DbRepo().GetPenaltiesForAllAuthors();
 
@@ -246,7 +333,7 @@ class Program
             string authorName = string.IsNullOrEmpty(author.Key) ? "Sconosciuto" : author.Key;
             return current + $"{authorName} ha preso {author.Value} multe\n";
         }
-        
+
         string text = penaltiesForAuthor.Aggregate(string.Empty, GetDesc);
 
         await botClient.SendMessage(
@@ -270,7 +357,6 @@ class Program
         CancellationToken cancellationToken,
         long chatId, string senderName, string messageText, DbRepo repo, [DisallowNull] int? entryId)
     {
-       
         AveMania? am = repo.Find(entryId.Value);
 
         string text =
@@ -285,7 +371,8 @@ class Program
         return text;
     }
 
-    private static async Task ShowActivity(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
+    private static async Task ShowActivity(ITelegramBotClient botClient, CancellationToken cancellationToken,
+        long chatId)
     {
         var daysForAuthor = new DbRepo().GetDaysSinceLastMessageForAllAuthors();
 

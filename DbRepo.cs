@@ -153,6 +153,31 @@ public class DbRepo
         return results;
     }
 
+    public bool HasAuthorExceededLimit(string author, int limit = 5)
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            string query = $@"
+                SELECT COUNT(*)
+                FROM {AmTableName}
+                WHERE author = @Author AND datetime >= @StartDate";
+
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                command.Parameters.AddWithValue("@Author", author);
+                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddDays(-1));
+
+                var result = command.ExecuteScalar();
+                if (result != null && int.TryParse(result.ToString(), out int count))
+                {
+                    return count > limit;
+                }
+            }
+        }
+
+        return false;
+    }
 
     public int? Check(string messageText)
     {
@@ -351,6 +376,24 @@ public class DbRepo
         }
 
         return results;
+    }
+
+    public int ClearPenalties()
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+
+            string deleteQuery = $@"
+                DELETE FROM {PenaltyTableName}
+                WHERE message LIKE '%AVE MANIA%'";
+
+            using (var command = new SQLiteCommand(deleteQuery, connection))
+            {
+                var b = command.ExecuteNonQuery();
+                return b;
+            }
+        }
     }
 
     public Dictionary<string, int> GetPenaltiesForAllAuthors()
