@@ -50,8 +50,7 @@ class Program
 
     static async Task Main(string[] args)
     {
-        string botToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw";
-        var botClient = new TelegramBotClient(botToken);
+        var botClient = new TelegramBotClient(BotToken);
 
         // Start receiving updates
         using var cts = new CancellationTokenSource();
@@ -65,8 +64,7 @@ class Program
             HandleError,
             receiverOptions,
             cancellationToken: cts.Token);
-        
-        
+
         try
         {
             var me = await botClient.GetMe(cancellationToken: cts.Token);
@@ -110,8 +108,6 @@ class Program
         if (update.Message is not { } message || message.Text is not { } messageText)
             return;
 
-        var ln = update.Message.From.LastName;
-        
         await ProcessMessageBasedOnChatType(botClient, cancellationToken, message, messageText);
     }
 
@@ -129,12 +125,16 @@ class Program
     {
         var chatId = message.Chat.Id;
         var chatType = message.Chat.Type;
-        string senderName = message.From?.FirstName + " " + message.From?.LastName;
+        var userId = message.From?.Id!;
+        string senderName = message.From?.FirstName!;
+
+        if (!string.IsNullOrEmpty(message.From?.LastName))
+            senderName += $" {message.From?.LastName}";
 
         // Check if the message is from a group
         if (chatType == ChatType.Group || chatType == ChatType.Supergroup)
         {
-            await HandleGroupMessage(botClient, cancellationToken, chatId, senderName, messageText);
+            await HandleGroupMessage(botClient, cancellationToken, chatId, userId, senderName, messageText);
         }
         else
         {
@@ -148,12 +148,15 @@ class Program
     /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
     /// <param name="cancellationToken">Propagates notification that the operation should be canceled.</param>
     /// <param name="chatId">The unique identifier of the group chat where the message was received.</param>
+    /// <param name="userId"></param>
     /// <param name="senderName">The name of the user who sent the message in the group.</param>
     /// <param name="messageText">The text of the message received in the group.</param>
     /// <returns>A task representing the asynchronous operation of processing the group message.</returns>
     private static async Task HandleGroupMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
-        long chatId, string senderName, string messageText)
+        long chatId, long? userId, string senderName, string messageText)
     {
+        Console.WriteLine($"Received message from {chatId} - {senderName}: {messageText}");
+
         if (Helpers.IsAveMania(messageText))
         {
             DbRepo repo = new DbRepo();
@@ -170,56 +173,67 @@ class Program
                 long unixTimestamp = new DateTimeOffset(DateTime.Now).ToUnixTimeSeconds();
                 repo.Add(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now));
             }
-            
-            var exceeded = repo.HasAuthorExceededLimit(senderName);
-            if (exceeded)
+
+            var limit = 3;
+            var exceeded = repo.HasAuthorExceededLimit(senderName, limit);
+            switch (exceeded.hasExceeded)
             {
-                List<string> remarks =
-                [
-                    "messo il turbo oggi, eh?",
-                    "sei un podcast vivente ma hai rotto il cazzo",
-                    "stai facendo il monologo finale di un film, o c’è una pausa da qualche parte?",
-                    "vuoi un microfono, o ti senti già abbastanza amplificato?",
-                    "sei già al capitolo 3 del tuo libro di puttanate?",
-                    "minchia oh, non c  i sei solo tu qua eh",
-                    "forse è il momento di passare la parola agli altri.",
-                    "vai a giocare con la merda nella tundra.",
-                    "mi piacerebbe sentire anche il punto di vista di qualcun altro di voi stronzetti.",
-                    "grazie per la tua passione, ma non hai un cazzo da fare oggi?",
-                    "puoi riassumere? Abbiamo poco tempo per leggere tutte le cagate che scrivi.",
-                    "hai coperto ogni dettaglio delle tue minchiate, possiamo passare al prossimo argomento?",
-                    "facciamo un break dalle minchiate, che dici?",
-                    "va bene, ho capito. Possiamo chiudere il discorso qui che hai scardinato lo scroto?",
-                    "ma smettila di fare il gazzabbubbo di turno, che qui non siamo al circo!",
-                    "se continui a parlare così, finisci dritto dritto nel manuale del perfetto spruzzafuffa.",
-                    "ma sei proprio un mestolone di gorgoglione oggi, eh?",
-                    "oh, gazzabbubbo ufficiale, la parola la passiamo anche agli altri o no?",
-                    "sembri un frastugliacazzi, vai avanti all’infinito!",
-                    "basta con questa manfrina da scatafasco ambulante!",
-                    "ma quanto hai bevuto dal calderone della logorrina oggi?"
-                ];
-                
-                static string GetRandomRemark(List<string> remarks)
+                case true when exceeded.count > limit + 1:
                 {
-                    if (remarks == null || remarks.Count == 0)
+                    DateTime? banDate = await BanChatMember(botClient, chatId, userId, cancellationToken);
+                    if (banDate.HasValue)
                     {
-                        throw new ArgumentException("La lista non può essere nulla o vuota.");
+                        await botClient.SendMessage(
+                            chatId: chatId,
+                            text:
+                            $"{MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione fino al {banDate.Value:g} {MalePoliceEmoji}",
+                            cancellationToken: cancellationToken);
                     }
-
-                    Random random = new Random();
-                    int index = random.Next(remarks.Count);
-                    return remarks[index];
+                    return;
                 }
-
-                string randomRemark = GetRandomRemark(remarks);
-                
-                await botClient.SendMessage(
-                    chatId: chatId,
-                    text: $"{senderName}, {randomRemark}",
-                    cancellationToken: cancellationToken);
+                case true:
+                    await RemarkUser(botClient, cancellationToken, chatId, senderName, Remarks);
+                    break;
             }
         }
     }
+
+    private static async Task RemarkUser(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId,
+        string senderName, List<string> remarks)
+    {
+        await botClient.SendMessage(
+            chatId: chatId,
+            text: $"{senderName}, {GetRandomRemark(remarks)}. Al prossimo richiamo di oggi scatterà l'arresto. ",
+            cancellationToken: cancellationToken);
+    }
+
+    private static string GetRandomRemark(List<string> remarks)
+    {
+        if (remarks == null || remarks.Count == 0)
+        {
+            throw new ArgumentException("La lista non può essere nulla o vuota.");
+        }
+
+        Random random = new Random();
+        int index = random.Next(remarks.Count);
+        return remarks[index];
+    }
+
+    /// <summary>
+    /// Triggers the bot to send a message to a specific chat.
+    /// </summary>
+    /// <param name="botClient"></param>
+    /// <param name="chatId">The unique identifier for the chat.</param>
+    /// <param name="message">The message to send to the chat.</param>
+    static async Task TriggerBotMessage(ITelegramBotClient botClient, long chatId, string message,
+        CancellationToken cancellationToken)
+    {
+        await botClient.SendMessage(
+            chatId: chatId,
+            text: message,
+            cancellationToken: cancellationToken);
+    }
+
 
     /// <summary>
     /// Handles private messages sent to the bot, parses the message text, and performs operations based on specific commands.
@@ -237,6 +251,18 @@ class Program
             if (messageText.ToLower().StartsWith("/s "))
             {
                 await SearchResults(botClient, cancellationToken, chatId, messageText);
+                return;
+            }
+
+            if (messageText.ToLower().StartsWith("/sqlcmd "))
+            {
+                await ExecuteSQLCode(botClient, cancellationToken, chatId, messageText);
+                return;
+            }
+
+            if (messageText.ToLower().StartsWith("/echo "))
+            {
+                await TriggerBotMessage(botClient, AmChatId, messageText.Replace("/echo ", ""), cancellationToken);
                 return;
             }
 
@@ -297,6 +323,21 @@ class Program
                     await ShowPenalties(botClient, cancellationToken, chatId);
                     break;
                 }
+                case "/pr":
+                {
+                    DbRepo repo = new DbRepo();
+                    var stats = repo.GetPenaltiesRatioStats();
+
+                    string statsDescription = stats.Aggregate("Statistiche sulle multe:\n",
+                        (current, stat) => current + $"{stat.Key}: {stat.Value:P}\n");
+
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: statsDescription,
+                        cancellationToken: cancellationToken);
+
+                    break;
+                }
                 case "/r":
                 {
                     var r = new DbRepo().GetRandom(3);
@@ -310,6 +351,16 @@ class Program
                 case "/db":
                 {
                     await SendDatabaseFile(botClient, cancellationToken, chatId);
+                    break;
+                }
+                case "/v":
+                {
+                    string assemblyVersion = typeof(Program).Assembly.GetName().Version?.ToString() ??
+                                             "Version not available";
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: $"L'attuale versione è: {assemblyVersion}",
+                        cancellationToken: cancellationToken);
                     break;
                 }
                 case "/d":
@@ -346,6 +397,7 @@ class Program
                               "/h - Mostra questo messaggio\n" +
                               "/r - Restituisce 3 avemanie a caso\n" +
                               "/act - Dati sull'attività dei partecipanti\n" +
+                              "/v - Numero di versione\n" +
                               "/db - Scarica il db",
                         cancellationToken: cancellationToken);
                     break;
@@ -358,6 +410,12 @@ class Program
                 text: e.Message,
                 cancellationToken: cancellationToken);
         }
+    }
+
+    private static async Task ExecuteSQLCode(ITelegramBotClient botClient, CancellationToken cancellationToken,
+        long chatId, string messageText)
+    {
+        new DbRepo().Execute(messageText);
     }
 
     private static async Task ShowPenalties(ITelegramBotClient botClient, CancellationToken cancellationToken,
@@ -494,6 +552,35 @@ class Program
                 "Che cazzo stai blaterando, non hai scritto un'avemania. Scrivi /s PAROLA per cercare tutte le avemanie che contengono PAROLA",
                 cancellationToken: cancellationToken);
         }
+    }
+
+    static async Task<DateTime?> BanChatMember(ITelegramBotClient botClient, long chatId, long? userId,
+        CancellationToken cancellationToken)
+    {
+        Random random = new Random();
+        int randomNumber = random.Next(2, 8); // Generates a random integer between 1 and 7 inclusive.
+        var banDate = DateTime.Now.AddDays(randomNumber);
+
+        if (userId != null)
+        {
+            await botClient.RestrictChatMember(
+                chatId: chatId,
+                userId: userId.Value,
+                permissions: new ChatPermissions
+                {
+                    CanSendMessages = false, // User can't send messages
+                    CanSendPolls = false,
+                    CanSendOtherMessages = false,
+                    CanAddWebPagePreviews = false,
+                    CanChangeInfo = false,
+                    CanInviteUsers = false,
+                    CanPinMessages = false
+                }, false, banDate, cancellationToken);
+
+            return banDate;
+        }
+
+        return null;
     }
 
     private static Task HandleError(ITelegramBotClient botClient, Exception exception,

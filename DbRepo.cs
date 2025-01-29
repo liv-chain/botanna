@@ -153,7 +153,7 @@ public class DbRepo
         return results;
     }
 
-    public bool HasAuthorExceededLimit(string author, int limit = 5)
+    public (bool hasExceeded, int count) HasAuthorExceededLimit(string author, int limit)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -166,17 +166,16 @@ public class DbRepo
             using (var command = new SQLiteCommand(query, connection))
             {
                 command.Parameters.AddWithValue("@Author", author);
-                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddDays(-1));
-
+                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddHours(-10));
                 var result = command.ExecuteScalar();
                 if (result != null && int.TryParse(result.ToString(), out int count))
                 {
-                    return count > limit;
+                    return (count > limit, count);
                 }
             }
         }
 
-        return false;
+        return (false, 0);
     }
 
     public int? Check(string messageText)
@@ -423,5 +422,61 @@ public class DbRepo
                 }
             }
         }
+    }
+
+    public void Execute(string messageText)
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            var cmd = messageText.Replace("/sqlcmd ", "");
+            using (var command = new SQLiteCommand(cmd, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        Console.WriteLine("SQL command executed successfully.");
+    }
+
+    public Dictionary<string, double> GetPenaltiesRatioStats()
+    {
+        Dictionary<string, double> authorRatios = new Dictionary<string, double>();
+
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            string query = $@"
+            SELECT 
+                a.author, 
+                COUNT(a.id) AS aveManiaCount, 
+                IFNULL(p.penaltyCount, 0) AS penaltyCount
+            FROM
+                (SELECT * FROM {AmTableName} WHERE datetime >= '2025-01-01') a
+            LEFT JOIN 
+                (SELECT author, COUNT(*) AS penaltyCount FROM {PenaltyTableName} GROUP BY author) p
+            ON a.author = p.author
+            GROUP BY a.author";
+
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string author = reader["author"].ToString() ?? string.Empty;
+                        int aveManiaCount = Convert.ToInt32(reader["aveManiaCount"]);
+                        int penaltyCount = Convert.ToInt32(reader["penaltyCount"]);
+
+                        // Calculate the ratio;
+                        // avoid division by zero
+                        double ratio = aveManiaCount > 0 ? penaltyCount / (double)aveManiaCount : 0;
+                        authorRatios[author] = ratio;
+                    }
+                }
+            }
+        }
+
+        return authorRatios.OrderByDescending(kvp => kvp.Value).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
     }
 }
