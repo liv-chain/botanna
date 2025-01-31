@@ -142,15 +142,17 @@ class Program
         }
     }
 
+
     /// <summary>
-    /// Handles incoming group messages, determines if they match specific criteria, and processes them accordingly by checking for duplicates or saving new messages.
+    /// Processes messages sent in a group or supergroup chat. Handles specific message content,
+    /// determines whether a penalty or remark is to be issued, and manages user warnings or bans if limits are exceeded.
     /// </summary>
-    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
+    /// <param name="botClient">The Telegram bot client used to send messages or perform chat actions.</param>
     /// <param name="cancellationToken">Propagates notification that the operation should be canceled.</param>
-    /// <param name="chatId">The unique identifier of the group chat where the message was received.</param>
-    /// <param name="userId"></param>
-    /// <param name="senderName">The name of the user who sent the message in the group.</param>
-    /// <param name="messageText">The text of the message received in the group.</param>
+    /// <param name="chatId">The unique identifier of the group or supergroup chat where the message was sent.</param>
+    /// <param name="userId">The unique identifier of the user who sent the message.</param>
+    /// <param name="senderName">The name of the user who sent the message. Includes both first name and last name if available.</param>
+    /// <param name="messageText">The message text content received from the group or supergroup.</param>
     /// <returns>A task representing the asynchronous operation of processing the group message.</returns>
     private static async Task HandleGroupMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
         long chatId, long? userId, string senderName, string messageText)
@@ -175,7 +177,9 @@ class Program
             }
 
             var limit = 3;
-            var exceeded = repo.HasAuthorExceededLimit(senderName, limit);
+            (bool hasExceeded, int count, DateTime? dt) exceeded = repo.HasAuthorExceededLimit(senderName, limit);
+            Console.WriteLine($"Exceeded: {exceeded.hasExceeded} - {exceeded.count}");
+            
             switch (exceeded.hasExceeded)
             {
                 case true when exceeded.count > limit + 1:
@@ -192,18 +196,23 @@ class Program
                     return;
                 }
                 case true:
-                    await RemarkUser(botClient, cancellationToken, chatId, senderName, Remarks);
+                    await RemarkUser(botClient, cancellationToken, chatId, senderName, Remarks, exceeded.dt);
                     break;
             }
         }
     }
 
     private static async Task RemarkUser(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId,
-        string senderName, List<string> remarks)
+        string senderName, List<string> remarks, DateTime? dt)
     {
+        string timeMsg = string.Empty;
+        if (dt != null)
+        {
+            timeMsg = $" - Potrai riprendere a scrivere senza incorrere in sanzioni alle {dt.Value:t} ";
+        }
         await botClient.SendMessage(
             chatId: chatId,
-            text: $"{senderName}, {GetRandomRemark(remarks)}. Al prossimo richiamo di oggi scatterà l'arresto. ",
+            text: $"{senderName}, {GetRandomRemark(remarks)} Al prossimo richiamo di oggi scatterà l'arresto.{timeMsg}{MalePoliceEmoji}",
             cancellationToken: cancellationToken);
     }
 

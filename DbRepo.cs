@@ -9,7 +9,8 @@ public class DbRepo
     private const string ConnectionString = $"Data Source={DbPath};Version=3;";
     private const string AmTableName = "ave_mania";
     private const string PenaltyTableName = "penalties";
-
+    public const int Hours = 12;
+    
     private const string CreateTableQuery =
         $"CREATE TABLE IF NOT EXISTS {AmTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
 
@@ -153,7 +154,7 @@ public class DbRepo
         return results;
     }
 
-    public (bool hasExceeded, int count) HasAuthorExceededLimit(string author, int limit)
+    public (bool hasExceeded, int count, DateTime?) HasAuthorExceededLimit(string author, int limit)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -166,16 +167,56 @@ public class DbRepo
             using (var command = new SQLiteCommand(query, connection))
             {
                 command.Parameters.AddWithValue("@Author", author);
-                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddHours(-10));
+                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddHours(-Hours));
                 var result = command.ExecuteScalar();
                 if (result != null && int.TryParse(result.ToString(), out int count))
                 {
-                    return (count > limit, count);
+                    bool exceeded = count > limit;
+                    if (exceeded)
+                    {
+                        Console.WriteLine($"Author {author} has exceeded the limit of {limit} messages");
+                        var dt = GetOldestMessageDateForAuthorInLastHours(author, Hours);
+                        if (dt != null) Console.WriteLine($"Last message date: {dt.Value:dd/MM/yyyy HH:mm:ss}");
+                        return (exceeded, count, dt?.AddHours(Hours));
+                    }
+                    return (exceeded, count, null);
                 }
             }
         }
 
-        return (false, 0);
+        return (false, 0, null);
+    }
+
+    
+
+
+    public DateTime? GetOldestMessageDateForAuthorInLastHours(string author, int hours)
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+
+            string query = $@"
+                SELECT MIN(datetime)
+                FROM {AmTableName}
+                WHERE author = @Author AND datetime >= @StartDate";
+
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                command.Parameters.AddWithValue("@Author", author);
+                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddHours(-hours));
+                var result = command.ExecuteScalar();
+                if (result != DBNull.Value && result != null)
+                {
+                    if (DateTime.TryParse(result.ToString(), out DateTime oldestDate))
+                    {
+                        return oldestDate;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     public int? Check(string messageText)
