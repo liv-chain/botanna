@@ -60,16 +60,16 @@ public class DbRepo
     public async Task TelegramBonificone(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
     {
         Console.WriteLine("Importing data...");
-        TelegramChatData chatData = LoadTelegramChatDataFromJsonFiles();
+        Root chatData = LoadTelegramChatDataFromJsonFiles();
         await ImportChatData(chatData.Messages, botClient, cancellationToken, chatId);
     }
 
-    private async Task ImportChatData(List<JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
+    private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
     {
         var lastMessageDateTime = GetLastMessageDateTime();
         long unixTime = ((DateTimeOffset)lastMessageDateTime!).ToUnixTimeSeconds();
 
-        var messages = chatDataMessages.Where(m => m.DateUnixTime > unixTime);
+        var messages = chatDataMessages.Where(m => long.Parse(m.DateUnixtime) > unixTime);
         foreach (AveManiaBot.JsonData.Telegram.Message m in messages)
         {
             // verifica se è già nel db
@@ -83,8 +83,8 @@ public class DbRepo
             {
                 // se esiste invia una multa
                 Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
-                // Add(new Penalty(m.Text, m.From, m.DateUnixTime, DateTime.Now));
-                // await SendPenaltyMessage(botClient, cancellationToken, chatId, m.From, m.Text, this, existingMessageId);
+                Add(new Penalty(m.Text, m.Actor, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
+                await SendPenaltyMessage(botClient, cancellationToken, chatId, m.Actor, m.Text, this, existingMessageId);
             }
             else
             {
@@ -93,6 +93,7 @@ public class DbRepo
                 // Add(new AveMania(message, m.From, m.DateUnixTime, DateTime.Now));
             }
         }
+
     }
 
     private static async Task<string> SendPenaltyMessage(ITelegramBotClient botClient,
@@ -114,9 +115,11 @@ public class DbRepo
     }
 
 
-    private TelegramChatData LoadTelegramChatDataFromJsonFiles()
+    private Root LoadTelegramChatDataFromJsonFiles()
     {
-        throw new NotImplementedException();
+        string jsonContent = File.ReadAllText("jsondata/result.json");
+        var mappedObjects = JsonSerializer.Deserialize<Root>(jsonContent);
+        return mappedObjects;
     }
 
     private static void ImportChatData(List<ChatData> chatData, SQLiteConnection connection)

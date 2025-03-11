@@ -1871,31 +1871,6 @@
    ]
   },
   {
-   "id": -999963196,
-   "type": "message",
-   "date": "2025-01-07T20:38:12",
-   "date_unixtime": "1736278692",
-   "from": "Cugino Davide",
-   "from_id": "user1102384045",
-   "text": [
-    {
-     "type": "mention",
-     "text": "@Avemaniabot"
-    },
-    " oh, come butta?"
-   ],
-   "text_entities": [
-    {
-     "type": "mention",
-     "text": "@Avemaniabot"
-    },
-    {
-     "type": "plain",
-     "text": " oh, come butta?"
-    }
-   ]
-  },
-  {
    "id": -999963195,
    "type": "message",
    "date": "2025-01-07T20:38:34",
@@ -2321,49 +2296,6 @@
      "text": "La chat bot è lesbica?"
     }
    ]
-  },
-  {
-   "id": -999963156,
-   "type": "message",
-   "date": "2025-01-07T21:31:37",
-   "date_unixtime": "1736281897",
-   "edited": "2025-01-07T21:31:51",
-   "edited_unixtime": "1736281911",
-   "from": "Pavel",
-   "from_id": "user32061292",
-   "text": [
-    {
-     "type": "mention_name",
-     "text": "Livio",
-     "user_id": 446167176
-    },
-    " bravon e basta"
-   ],
-   "text_entities": [
-    {
-     "type": "mention_name",
-     "text": "Livio",
-     "user_id": 446167176
-    },
-    {
-     "type": "plain",
-     "text": " bravon e basta"
-    }
-   ],
-   "reactions": [
-     {
-      "type": "emoji",
-      "count": 1,
-      "emoji": "❤",
-      "recent": [
-       {
-        "from": "Livio Caenazzo",
-        "from_id": "user446167176",
-        "date": "2025-01-07T21:31:51"
-       }
-      ]
-     }
-    ]
   },
   {
    "id": -999963155,
@@ -3754,33 +3686,6 @@
    ]
   },
   {
-   "id": -999962859,
-   "type": "message",
-   "date": "2025-01-08T18:00:52",
-   "date_unixtime": "1736355652",
-   "from": "Cugino Davide",
-   "from_id": "user1102384045",
-   "text": [
-    {
-     "type": "mention_name",
-     "text": "Livio",
-     "user_id": 446167176
-    },
-    " dovremmo assegnarci dei nomi belli"
-   ],
-   "text_entities": [
-    {
-     "type": "mention_name",
-     "text": "Livio",
-     "user_id": 446167176
-    },
-    {
-     "type": "plain",
-     "text": " dovremmo assegnarci dei nomi belli"
-    }
-   ]
-  },
-  {
    "id": -999962858,
    "type": "message",
    "date": "2025-01-08T18:01:17",
@@ -4134,34 +4039,6 @@
     {
      "type": "plain",
      "text": " è la nostra Alexa"
-    }
-   ]
-  },
-  {
-   "id": 4,
-   "type": "message",
-   "date": "2025-01-08T18:09:37",
-   "date_unixtime": "1736356177",
-   "from": "⚠️ AVE MANIA ⚠️ in manutenzione",
-   "from_id": "channel2381222429",
-   "author": "Gran visir",
-   "text": [
-    {
-     "type": "mention_name",
-     "text": "Livio",
-     "user_id": 446167176
-    },
-    " Ma come hai fatto?"
-   ],
-   "text_entities": [
-    {
-     "type": "mention_name",
-     "text": "Livio",
-     "user_id": 446167176
-    },
-    {
-     "type": "plain",
-     "text": " Ma come hai fatto?"
     }
    ]
   },

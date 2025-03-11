@@ -1,42 +1,35 @@
-﻿namespace AveManiaBot.JsonData.Telegram;
+﻿using System.Text.Json.Serialization;
 
-public class TelegramChatData
+namespace AveManiaBot.JsonData.Telegram;
+
+public class Root
 {
+    [JsonPropertyName("name")]
     public string Name { get; set; }
+    
+    [JsonPropertyName("type")]
     public string Type { get; set; }
+    
+    [JsonPropertyName("id")]
     public long Id { get; set; }
+    
+    [JsonPropertyName("messages")]
     public List<Message> Messages { get; set; }
 }
 
 public class Message
-{
-    public long Id { get; set; }
-    public string Type { get; set; }
-    public DateTime Date { get; set; }
-    public long DateUnixTime { get; set; }
-        
-    // For messages
-    public string From { get; set; }
-    public string FromId { get; set; }
-    public string Text { get; set; }
-    public List<TextEntity> TextEntities { get; set; }
-        
-    // For service messages
-    public string Actor { get; set; }
-    public string ActorId { get; set; }
-    public string Action { get; set; }
-    public string Title { get; set; }
-    public List<string> Members { get; set; }
-
-    // For photo-related actions
-    public string Photo { get; set; }
-    public int? PhotoFileSize { get; set; }
-    public int? Width { get; set; }
-    public int? Height { get; set; }
-}
-
-public class TextEntity
-{
-    public string Type { get; set; }
-    public string Text { get; set; }
+{    
+    [JsonPropertyName("date")]
+    public DateTime? Date { get; set; }
+    
+    [JsonPropertyName("date_unixtime")]
+    public string? DateUnixtime { get; set; }
+    
+    [JsonPropertyName("actor")]
+    public string? Actor { get; set; }   
+    
+    [JsonPropertyName("text")]
+    [JsonConverter(typeof(TextFieldConverter))]
+    public string? Text { get; set; }
+    
 }
