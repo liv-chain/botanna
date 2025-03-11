@@ -48,7 +48,8 @@ class Program
         "Mi fai sentire come se stessi leggendo il manuale di un elettrodomestico.",
         "Hai già conquistato il trofeo del scassacazzi dell’anno, possiamo passare oltre?"
     ];
-
+    
+    
     static async Task Main(string[] args)
     {
         var botClient = new TelegramBotClient(BotToken);
@@ -59,13 +60,15 @@ class Program
         {
             AllowedUpdates = Array.Empty<UpdateType>() // Receive all update types
         };
-
+        
+        new DbRepo().Check("diocannone");
+        
         botClient.StartReceiving(
             HandleUpdate,
             HandleError,
             receiverOptions,
             cancellationToken: cts.Token);
-
+        
         try
         {
             var me = await botClient.GetMe(cancellationToken: cts.Token);
@@ -93,6 +96,11 @@ class Program
 
         Console.ReadLine();
         await cts.CancelAsync(); // Stop the bot when the program exits
+    }
+
+    private static void RestartBotClient(object? state)
+    {
+        
     }
 
     /// <summary>

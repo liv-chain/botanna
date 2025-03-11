@@ -73,7 +73,7 @@ public class DbRepo
         foreach (AveManiaBot.JsonData.Telegram.Message m in messages)
         {
             // verifica se è già nel db
-            string message = m.Text;
+            string message = m.Text!;
 
             bool isAm = Helpers.IsAveMania(message);
             if (!isAm) continue;
@@ -81,16 +81,16 @@ public class DbRepo
             int? existingMessageId = Check(message);
             if (existingMessageId.HasValue)
             {
-                // se esiste invia una multa
+                // se esiste invia una multa todo 1
                 Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
-                Add(new Penalty(m.Text, m.Actor, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
-                await SendPenaltyMessage(botClient, cancellationToken, chatId, m.Actor, m.Text, this, existingMessageId);
+                //await SendPenaltyMessage(botClient, cancellationToken, chatId, m.Actor, m.Text, this, existingMessageId);
+                //Add(new Penalty(m.Text, m.Actor, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
             }
             else
             {
                 // se non esiste inserisci una ave mania
                 Console.WriteLine($"Message does not exist in the database. Adding an AveMania message.");
-                // Add(new AveMania(message, m.From, m.DateUnixTime, DateTime.Now));
+                //Add(new AveMania(message, m.Actor, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
             }
         }
 
