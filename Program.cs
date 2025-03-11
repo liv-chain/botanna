@@ -18,11 +18,12 @@ class Program
     static readonly List<string> Remarks =
     [
         "messo il turbo oggi, eh?",
-        "sei un podcast vivente ma hai rotto il cazzo",
+        "sei un podcast vivente ma hai rotto il cazzo.",
         "stai facendo il monologo finale di un film, o c’è una pausa da qualche parte?",
         "vuoi un microfono, o ti senti già abbastanza amplificato?",
         "sei già al capitolo 3 del tuo libro di puttanate?",
-        "minchia oh, non ci sei solo tu qua eh",
+        "minchia oh, non ci sei solo tu qua eh.",
+        "vai a scavare buche nel Tagliamento.",
         "forse è il momento di passare la parola agli altri.",
         "vai a giocare con la merda nella tundra.",
         "mi piacerebbe sentire anche il punto di vista di qualcun altro di voi stronzetti.",
@@ -177,12 +178,12 @@ class Program
             }
 
             var limit = 3;
-            (bool hasExceeded, int count, DateTime? dt) exceeded = repo.HasAuthorExceededLimit(senderName, limit);
-            Console.WriteLine($"Exceeded: {exceeded.hasExceeded} - {exceeded.count}");
+            (bool hasExceeded, int count, DateTime? dt) checkResult = repo.HasAuthorExceededLimit(senderName, limit);
+            Console.WriteLine($"Exceeded: {checkResult.hasExceeded} - {checkResult.count}");
             
-            switch (exceeded.hasExceeded)
+            switch (checkResult.hasExceeded)
             {
-                case true when exceeded.count > limit + 1:
+                case true when checkResult.count > limit + 1:
                 {
                     DateTime? banDate = await BanChatMember(botClient, chatId, userId, cancellationToken);
                     if (banDate.HasValue)
@@ -196,36 +197,36 @@ class Program
                     return;
                 }
                 case true:
-                    await RemarkUser(botClient, cancellationToken, chatId, senderName, Remarks, exceeded.dt);
+                    await RemarkUser(botClient, cancellationToken, chatId, senderName, checkResult.dt);
                     break;
             }
         }
     }
 
     private static async Task RemarkUser(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId,
-        string senderName, List<string> remarks, DateTime? dt)
+        string senderName, DateTime? dt)
     {
         string timeMsg = string.Empty;
         if (dt != null)
         {
-            timeMsg = $" - Potrai riprendere a scrivere senza incorrere in sanzioni alle {dt.Value:t} ";
+            timeMsg = $" - Potrai riprendere a scrivere senza incorrere in arresto alle {dt.Value:t} ";
         }
         await botClient.SendMessage(
             chatId: chatId,
-            text: $"{senderName}, {GetRandomRemark(remarks)} Al prossimo richiamo di oggi scatterà l'arresto.{timeMsg}{MalePoliceEmoji}",
+            text: $"{senderName}, {GetRandomRemark()} Al prossimo richiamo di oggi scatterà l'arresto.{timeMsg}{MalePoliceEmoji}",
             cancellationToken: cancellationToken);
     }
 
-    private static string GetRandomRemark(List<string> remarks)
+    private static string GetRandomRemark()
     {
-        if (remarks == null || remarks.Count == 0)
+        if (Remarks == null || Remarks.Count == 0)
         {
             throw new ArgumentException("La lista non può essere nulla o vuota.");
         }
 
         Random random = new Random();
-        int index = random.Next(remarks.Count);
-        return remarks[index];
+        int index = random.Next(Remarks.Count);
+        return Remarks[index];
     }
 
     /// <summary>
@@ -294,6 +295,16 @@ class Program
                     await botClient.SendMessage(
                         chatId: chatId,
                         text: "Db inizializzato con successo!",
+                        cancellationToken: cancellationToken);
+                    break;
+                }
+                case "/telebon":
+                {
+                    await new DbRepo().TelegramBonificone(botClient, cancellationToken, chatId);
+                    
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: "Dati ripristinati con successo!",
                         cancellationToken: cancellationToken);
                     break;
                 }
@@ -455,13 +466,13 @@ class Program
     /// <param name="senderName">The name of the user who sent the duplicate message.</param>
     /// <param name="messageText">The text of the duplicate message.</param>
     /// <param name="repo">The database repository used to retrieve information about stored messages.</param>
-    /// <param name="entryId">The identifier of the original message entry in the database.</param>
+    /// <param name="originalAveManiaId">The identifier of the original message entry in the database.</param>
     /// <returns>A task representing the asynchronous operation of sending the notification message.</returns>
     private static async Task<string> SendPenaltyMessage(ITelegramBotClient botClient,
         CancellationToken cancellationToken,
-        long chatId, string senderName, string messageText, DbRepo repo, [DisallowNull] int? entryId)
+        long chatId, string senderName, string messageText, DbRepo repo, [DisallowNull] int? originalAveManiaId)
     {
-        AveMania? am = repo.Find(entryId.Value);
+        AveMania? am = repo.Find(originalAveManiaId.Value);
 
         string text =
             $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f";

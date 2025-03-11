@@ -1,5 +1,8 @@
 ﻿using System.Data.SQLite;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using AveManiaBot.JsonData.Telegram;
+using Telegram.Bot;
 
 namespace AveManiaBot;
 
@@ -9,8 +12,8 @@ public class DbRepo
     private const string ConnectionString = $"Data Source={DbPath};Version=3;";
     private const string AmTableName = "ave_mania";
     private const string PenaltyTableName = "penalties";
-    public const int Hours = 12;
-    
+    private const int Hours = 12; // Number of hours to check for author exceeding limit
+
     private const string CreateTableQuery =
         $"CREATE TABLE IF NOT EXISTS {AmTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
 
@@ -54,6 +57,68 @@ public class DbRepo
         }
     }
 
+    public async Task TelegramBonificone(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
+    {
+        Console.WriteLine("Importing data...");
+        TelegramChatData chatData = LoadTelegramChatDataFromJsonFiles();
+        await ImportChatData(chatData.Messages, botClient, cancellationToken, chatId);
+    }
+
+    private async Task ImportChatData(List<JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
+    {
+        var lastMessageDateTime = GetLastMessageDateTime();
+        long unixTime = ((DateTimeOffset)lastMessageDateTime!).ToUnixTimeSeconds();
+
+        var messages = chatDataMessages.Where(m => m.DateUnixTime > unixTime);
+        foreach (AveManiaBot.JsonData.Telegram.Message m in messages)
+        {
+            // verifica se è già nel db
+            string message = m.Text;
+
+            bool isAm = Helpers.IsAveMania(message);
+            if (!isAm) continue;
+
+            int? existingMessageId = Check(message);
+            if (existingMessageId.HasValue)
+            {
+                // se esiste invia una multa
+                Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
+                // Add(new Penalty(m.Text, m.From, m.DateUnixTime, DateTime.Now));
+                // await SendPenaltyMessage(botClient, cancellationToken, chatId, m.From, m.Text, this, existingMessageId);
+            }
+            else
+            {
+                // se non esiste inserisci una ave mania
+                Console.WriteLine($"Message does not exist in the database. Adding an AveMania message.");
+                // Add(new AveMania(message, m.From, m.DateUnixTime, DateTime.Now));
+            }
+        }
+    }
+
+    private static async Task<string> SendPenaltyMessage(ITelegramBotClient botClient,
+        CancellationToken cancellationToken,
+        long chatId, string senderName, string messageText, DbRepo repo, [DisallowNull] int? originalAveManiaId)
+    {
+        AveMania? am = repo.Find(originalAveManiaId.Value);
+
+        string text =
+            $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f";
+
+        await botClient.SendMessage(
+            chatId: chatId,
+            text,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+
+        return text;
+    }
+
+
+    private TelegramChatData LoadTelegramChatDataFromJsonFiles()
+    {
+        throw new NotImplementedException();
+    }
+
     private static void ImportChatData(List<ChatData> chatData, SQLiteConnection connection)
     {
         int i = 0;
@@ -64,12 +129,6 @@ public class DbRepo
             Console.WriteLine($"File {i++} of {chatData.Count} - {data.messages.Count} to be imported");
             foreach (var mess in data.messages)
             {
-                // if (mess.content != null && !mess.content.Any(c => c != null && c > 127))
-                // {
-                //     Console.WriteLine($"Skipping message {mess.content} (does not contains accented characters)");
-                //     continue;
-                // }
-
                 if (Helpers.IsAveMania(mess.content))
                 {
                     AveMania aveMania = new(mess.content, mess.sender_name, mess.timestamp_ms,
@@ -175,10 +234,11 @@ public class DbRepo
                     if (exceeded)
                     {
                         Console.WriteLine($"Author {author} has exceeded the limit of {limit} messages");
-                        var dt = GetOldestMessageDateForAuthorInLastHours(author, Hours);
-                        if (dt != null) Console.WriteLine($"Last message date: {dt.Value:dd/MM/yyyy HH:mm:ss}");
-                        return (exceeded, count, dt?.AddHours(Hours));
+                        DateTime? oldestMessageDateTimeInTimeSpan = GetOldestMessageDateForAuthorInLastHours(author, Hours);
+                        if (oldestMessageDateTimeInTimeSpan != null) Console.WriteLine($"Last message date: {oldestMessageDateTimeInTimeSpan.Value:dd/MM/yyyy HH:mm:ss}");
+                        return (exceeded, count, oldestMessageDateTimeInTimeSpan?.AddHours(Hours));
                     }
+
                     return (exceeded, count, null);
                 }
             }
@@ -186,8 +246,6 @@ public class DbRepo
 
         return (false, 0, null);
     }
-
-    
 
 
     public DateTime? GetOldestMessageDateForAuthorInLastHours(string author, int hours)
@@ -519,5 +577,30 @@ public class DbRepo
         }
 
         return authorRatios.OrderByDescending(kvp => kvp.Value).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+    }
+
+    public DateTime? GetLastMessageDateTime()
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+
+            string query = $@"SELECT MAX(datetime) AS lastMessageDateTime FROM {AmTableName}";
+
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                var result = command.ExecuteScalar();
+
+                if (result != DBNull.Value && result != null)
+                {
+                    if (DateTime.TryParse(result.ToString(), out DateTime lastMessageDateTime))
+                    {
+                        return lastMessageDateTime;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 }

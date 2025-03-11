@@ -17,7 +17,28 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="JsonData\" />
+      <None Remove="JsonData\photos\photo_6@08-01-2025_19-17-59.jpg" />
+      <None Remove="JsonData\photos\photo_5@08-01-2025_17-29-34.jpg" />
+      <None Remove="JsonData\photos\photo_4@08-01-2025_09-57-27.jpg" />
+      <None Remove="JsonData\photos\photo_3@08-01-2025_09-47-21.jpg" />
+      <None Remove="JsonData\photos\photo_2@08-01-2025_09-44-17.jpg" />
+      <None Remove="JsonData\photos\photo_29@11-03-2025_10-37-57.jpg" />
+      <None Remove="JsonData\photos\photo_28@11-03-2025_10-31-20.jpg" />
+      <None Remove="JsonData\photos\photo_27@01-03-2025_22-21-17.jpg" />
+      <None Remove="JsonData\photos\photo_26@23-02-2025_15-23-34.jpg" />
+      <None Remove="JsonData\photos\photo_25@10-02-2025_14-14-49.jpg" />
+      <None Remove="JsonData\photos\photo_24@27-01-2025_16-03-55.jpg" />
+      <None Remove="JsonData\photos\photo_23@27-01-2025_12-39-32.jpg" />
+      <None Remove="JsonData\photos\photo_1@02-01-2025_14-47-00.jpg" />
+      <None Remove="JsonData\photos\photo_19@20-01-2025_12-36-25.jpg" />
+      <None Remove="JsonData\photos\photo_18@20-01-2025_11-32-41.jpg" />
+      <None Remove="JsonData\photos\photo_17@19-01-2025_16-06-26.jpg" />
+      <None Remove="JsonData\photos\photo_12@17-01-2025_11-03-47.jpg" />
+      <None Remove="JsonData\photos\photo_11@17-01-2025_11-00-12.jpg" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="JsonData\photos\" />
     </ItemGroup>
 
 </Project>
