@@ -11,9 +11,11 @@ using Message = Telegram.Bot.Types.Message;
 // ReSharper disable once CheckNamespace
 class Program
 {
+    private static TelegramBotClient _botClient;
     private static readonly string BotToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw";
-    private static readonly long AmChatId = -1002381222429;
+    public static readonly long AmChatId = -1002381222429;
     private static readonly string MalePoliceEmoji = "\U0001F46E\u200D\u2642\U0000FE0F"; // 👮‍♂️
+    private static Timer? _timer;
 
     static readonly List<string> Remarks =
     [
@@ -26,6 +28,7 @@ class Program
         "vai a scavare buche nel Tagliamento.",
         "forse è il momento di passare la parola agli altri.",
         "vai a giocare con la merda nella tundra.",
+        "palettaaaaaaaaaaaaaaaaa!",
         "mi piacerebbe sentire anche il punto di vista di qualcun altro di voi stronzetti.",
         "grazie per la tua passione, ma non hai un cazzo da fare oggi?",
         "puoi riassumere? Abbiamo poco tempo per leggere tutte le cagate che scrivi.",
@@ -52,7 +55,19 @@ class Program
     
     static async Task Main(string[] args)
     {
-        var botClient = new TelegramBotClient(BotToken);
+        await RunBot();
+        _timer = new Timer(async _ => await RestartBot(), null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
+    }
+
+    private static async Task RestartBot()
+    {
+        await _botClient.Close();
+        await RunBot();
+    }
+
+    private static async Task RunBot()
+    {
+        _botClient = new TelegramBotClient(BotToken);
 
         // Start receiving updates
         using var cts = new CancellationTokenSource();
@@ -63,7 +78,7 @@ class Program
         
         new DbRepo().Check("diocannone");
         
-        botClient.StartReceiving(
+        _botClient.StartReceiving(
             HandleUpdate,
             HandleError,
             receiverOptions,
@@ -71,10 +86,10 @@ class Program
         
         try
         {
-            var me = await botClient.GetMe(cancellationToken: cts.Token);
+            var me = await _botClient.GetMe(cancellationToken: cts.Token);
             Console.WriteLine($"Bot {me.Username} is up and running!");
         }
-        catch (Exception e)
+        catch (Exception)
         {
             var retryPolicy = Policy.Handle<Exception>()
                 .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
@@ -85,7 +100,7 @@ class Program
                     });
             try
             {
-                var me = await retryPolicy.ExecuteAsync(() => botClient.GetMe(cancellationToken: cts.Token));
+                var me = await retryPolicy.ExecuteAsync(() => _botClient.GetMe(cancellationToken: cts.Token));
                 Console.WriteLine($"Bot {me.Username} is up and running!");
             }
             catch (Exception ex)
@@ -96,11 +111,6 @@ class Program
 
         Console.ReadLine();
         await cts.CancelAsync(); // Stop the bot when the program exits
-    }
-
-    private static void RestartBotClient(object? state)
-    {
-        
     }
 
     /// <summary>
@@ -274,13 +284,13 @@ class Program
 
             if (messageText.ToLower().StartsWith("/sqlcmd "))
             {
-                await ExecuteSQLCode(botClient, cancellationToken, chatId, messageText);
+                ExecuteSQLCode(messageText);
                 return;
             }
 
-            if (messageText.ToLower().StartsWith("/echo "))
+            if (messageText.ToLower().StartsWith("/ech "))
             {
-                await TriggerBotMessage(botClient, AmChatId, messageText.Replace("/echo ", ""), cancellationToken);
+                await TriggerBotMessage(botClient, AmChatId, messageText.Replace("/ech ", "", StringComparison.OrdinalIgnoreCase), cancellationToken);
                 return;
             }
 
@@ -306,9 +316,9 @@ class Program
                         cancellationToken: cancellationToken);
                     break;
                 }
-                case "/telebon":
+                case "/telepr":
                 {
-                    await new DbRepo().TelegramBonificone(botClient, cancellationToken, chatId);
+                    await new DbRepo().ProcessTelegramMessages(botClient, cancellationToken);
                     
                     await botClient.SendMessage(
                         chatId: chatId,
@@ -345,6 +355,11 @@ class Program
                 {
                     await ShowActivity(botClient, cancellationToken, chatId);
                     break;
+                }                
+                case "/killme":
+                {
+                    await botClient.Close(cancellationToken: cancellationToken);
+                    break;
                 }
                 case "/p":
                 {
@@ -373,6 +388,16 @@ class Program
                     await botClient.SendMessage(
                         chatId: chatId,
                         text: "Ecco 3 avemanie per te. Spero ti vadano di traverso. \n" + text,
+                        cancellationToken: cancellationToken);
+                    break;
+                }
+                case "/rrr":
+                {
+                    var r = new DbRepo().GetRandom(100);
+                    string text = string.Join("\n", r.Select(x => x.ToString()));
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: "Ecco 100 avemanie per te. Ora vai a leggerle sulla carreggiata. \n" + text,
                         cancellationToken: cancellationToken);
                     break;
                 }
@@ -422,9 +447,8 @@ class Program
                               "/c - Conta le avemanie\n" +
                               "/p - Mostra i dati sulle multe\n" +
                               "/d - Mostra le avemanie delle ultime 24 ore\n" +
-                              "/h - Mostra questo messaggio\n" +
                               "/r - Restituisce 3 avemanie a caso\n" +
-                              "/act - Dati sull'attività dei partecipanti\n" +
+                              "/rrr - Restituisce 100 avemanie a caso\n" +
                               "/v - Numero di versione\n" +
                               "/db - Scarica il db",
                         cancellationToken: cancellationToken);
@@ -440,8 +464,7 @@ class Program
         }
     }
 
-    private static async Task ExecuteSQLCode(ITelegramBotClient botClient, CancellationToken cancellationToken,
-        long chatId, string messageText)
+    private static void ExecuteSQLCode(string messageText)
     {
         new DbRepo().Execute(messageText);
     }

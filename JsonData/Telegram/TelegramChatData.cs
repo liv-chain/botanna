@@ -2,7 +2,7 @@
 
 namespace AveManiaBot.JsonData.Telegram;
 
-public class Root
+public class TelegramChatData
 {
     [JsonPropertyName("name")]
     public string Name { get; set; }
@@ -25,8 +25,8 @@ public class Message
     [JsonPropertyName("date_unixtime")]
     public string? DateUnixtime { get; set; }
     
-    [JsonPropertyName("actor")]
-    public string? Actor { get; set; }   
+    [JsonPropertyName("from")]
+    public string? From { get; set; }   
     
     [JsonPropertyName("text")]
     [JsonConverter(typeof(TextFieldConverter))]

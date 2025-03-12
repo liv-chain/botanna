@@ -57,14 +57,21 @@ public class DbRepo
         }
     }
 
-    public async Task TelegramBonificone(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
+    /// <summary>
+    /// Processes unprocessed Telegram messages by loading data from JSON files
+    /// and importing the chat messages into the system.
+    /// </summary>
+    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests during the asynchronous operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    public async Task ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken)
     {
-        Console.WriteLine("Importing data...");
-        Root chatData = LoadTelegramChatDataFromJsonFiles();
-        await ImportChatData(chatData.Messages, botClient, cancellationToken, chatId);
+        Console.WriteLine("Importing data from unprocessed telegram messages...");
+        var chatData = LoadTelegramChatDataFromJsonFiles();
+        await ImportChatData(chatData.Messages, botClient, cancellationToken);
     }
 
-    private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId)
+    private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, CancellationToken cancellationToken)
     {
         var lastMessageDateTime = GetLastMessageDateTime();
         long unixTime = ((DateTimeOffset)lastMessageDateTime!).ToUnixTimeSeconds();
@@ -83,14 +90,16 @@ public class DbRepo
             {
                 // se esiste invia una multa todo 1
                 Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
-                //await SendPenaltyMessage(botClient, cancellationToken, chatId, m.Actor, m.Text, this, existingMessageId);
-                //Add(new Penalty(m.Text, m.Actor, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
+                Add(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
+                await SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
+                
             }
             else
             {
                 // se non esiste inserisci una ave mania
+                Add(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
                 Console.WriteLine($"Message does not exist in the database. Adding an AveMania message.");
-                //Add(new AveMania(message, m.Actor, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
+                
             }
         }
 
@@ -98,7 +107,7 @@ public class DbRepo
 
     private static async Task<string> SendPenaltyMessage(ITelegramBotClient botClient,
         CancellationToken cancellationToken,
-        long chatId, string senderName, string messageText, DbRepo repo, [DisallowNull] int? originalAveManiaId)
+        string senderName, string messageText, DbRepo repo, [DisallowNull] int? originalAveManiaId)
     {
         AveMania? am = repo.Find(originalAveManiaId.Value);
 
@@ -106,19 +115,18 @@ public class DbRepo
             $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f";
 
         await botClient.SendMessage(
-            chatId: chatId,
+            chatId: Program.AmChatId,
             text,
             cancellationToken: cancellationToken).ConfigureAwait(false);
-
-
+        
         return text;
     }
 
 
-    private Root LoadTelegramChatDataFromJsonFiles()
+    private TelegramChatData? LoadTelegramChatDataFromJsonFiles()
     {
         string jsonContent = File.ReadAllText("jsondata/result.json");
-        var mappedObjects = JsonSerializer.Deserialize<Root>(jsonContent);
+        var mappedObjects = JsonSerializer.Deserialize<TelegramChatData>(jsonContent);
         return mappedObjects;
     }
 
