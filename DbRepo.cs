@@ -491,25 +491,7 @@ public class DbRepo
 
         return results;
     }
-
-    public int ClearPenalties()
-    {
-        using (var connection = new SQLiteConnection(ConnectionString))
-        {
-            connection.Open();
-
-            string deleteQuery = $@"
-                DELETE FROM {PenaltyTableName}
-                WHERE message LIKE '%AVE MANIA%'";
-
-            using (var command = new SQLiteCommand(deleteQuery, connection))
-            {
-                var b = command.ExecuteNonQuery();
-                return b;
-            }
-        }
-    }
-
+    
     public Dictionary<string, int> GetPenaltiesForAllAuthors()
     {
         using (var connection = new SQLiteConnection(ConnectionString))

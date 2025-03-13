@@ -51,8 +51,8 @@ class Program
         "Mi fai sentire come se stessi leggendo il manuale di un elettrodomestico.",
         "Hai già conquistato il trofeo del scassacazzi dell’anno, possiamo passare oltre?"
     ];
-    
-    
+
+
     static async Task Main(string[] args)
     {
         await RunBot();
@@ -61,6 +61,7 @@ class Program
 
     private static async Task RestartBot()
     {
+        Console.WriteLine("Restarting bot...");
         await _botClient.Close();
         await RunBot();
     }
@@ -73,17 +74,17 @@ class Program
         using var cts = new CancellationTokenSource();
         var receiverOptions = new ReceiverOptions
         {
-            AllowedUpdates = Array.Empty<UpdateType>() // Receive all update types
+            AllowedUpdates = [] // Receive all update types
         };
-        
+
         new DbRepo().Check("diocannone");
-        
+
         _botClient.StartReceiving(
             HandleUpdate,
             HandleError,
             receiverOptions,
             cancellationToken: cts.Token);
-        
+
         try
         {
             var me = await _botClient.GetMe(cancellationToken: cts.Token);
@@ -198,7 +199,7 @@ class Program
             var limit = 3;
             (bool hasExceeded, int count, DateTime? dt) checkResult = repo.HasAuthorExceededLimit(senderName, limit);
             Console.WriteLine($"Exceeded: {checkResult.hasExceeded} - {checkResult.count}");
-            
+
             switch (checkResult.hasExceeded)
             {
                 case true when checkResult.count > limit + 1:
@@ -212,6 +213,7 @@ class Program
                             $"{MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione fino al {banDate.Value:g} {MalePoliceEmoji}",
                             cancellationToken: cancellationToken);
                     }
+
                     return;
                 }
                 case true:
@@ -227,11 +229,13 @@ class Program
         string timeMsg = string.Empty;
         if (dt != null)
         {
-            timeMsg = $" - Potrai riprendere a scrivere senza incorrere in arresto alle {dt.Value:t} ";
+            timeMsg = $" Potrai riprendere a scrivere senza incorrere in arresto alle {dt.Value:t} ";
         }
+
         await botClient.SendMessage(
             chatId: chatId,
-            text: $"{senderName}, {GetRandomRemark()} Al prossimo richiamo di oggi scatterà l'arresto.{timeMsg}{MalePoliceEmoji}",
+            text:
+            $"{senderName}, {GetRandomRemark()} Al prossimo richiamo di oggi scatterà l'arresto.{timeMsg}{MalePoliceEmoji}",
             cancellationToken: cancellationToken);
     }
 
@@ -285,13 +289,14 @@ class Program
 
             if (messageText.ToLower().StartsWith("/sqlcmd "))
             {
-                ExecuteSQLCode(messageText);
+                new DbRepo().Execute(messageText);
                 return;
             }
 
             if (messageText.ToLower().StartsWith("/ech "))
             {
-                await TriggerBotMessage(botClient, AmChatId, messageText.Replace("/ech ", "", StringComparison.OrdinalIgnoreCase), cancellationToken);
+                await TriggerBotMessage(botClient, AmChatId,
+                    messageText.Replace("/ech ", "", StringComparison.OrdinalIgnoreCase), cancellationToken);
                 return;
             }
 
@@ -320,7 +325,7 @@ class Program
                 case "/telepr":
                 {
                     await new DbRepo().ProcessTelegramMessages(botClient, cancellationToken);
-                    
+
                     await botClient.SendMessage(
                         chatId: chatId,
                         text: "Dati ripristinati con successo!",
@@ -343,20 +348,11 @@ class Program
                         cancellationToken: cancellationToken);
                     break;
                 }
-                case "/clr":
-                {
-                    var count = new DbRepo().ClearPenalties();
-                    await botClient.SendMessage(
-                        chatId: chatId,
-                        text: $"Sono state cancellate {count} avemanie \ud83d\ude0a",
-                        cancellationToken: cancellationToken);
-                    break;
-                }
                 case "/act":
                 {
                     await ShowActivity(botClient, cancellationToken, chatId);
                     break;
-                }                
+                }
                 case "/killme":
                 {
                     await botClient.Close(cancellationToken: cancellationToken);
@@ -365,21 +361,6 @@ class Program
                 case "/p":
                 {
                     await ShowPenalties(botClient, cancellationToken, chatId);
-                    break;
-                }
-                case "/pr":
-                {
-                    DbRepo repo = new DbRepo();
-                    var stats = repo.GetPenaltiesRatioStats();
-
-                    string statsDescription = stats.Aggregate("Statistiche sulle multe:\n",
-                        (current, stat) => current + $"{stat.Key}: {stat.Value:P}\n");
-
-                    await botClient.SendMessage(
-                        chatId: chatId,
-                        text: statsDescription,
-                        cancellationToken: cancellationToken);
-
                     break;
                 }
                 case "/r":
@@ -399,12 +380,13 @@ class Program
                     {
                         string text = string.Join("\n", r.Skip(i).Take(10)
                             .Select(x => x.ToString()));
-                        
+
                         await botClient.SendMessage(
                             chatId: chatId,
                             text: "\n" + text,
                             cancellationToken: cancellationToken);
                     }
+
                     break;
                 }
                 case "/db":
@@ -470,11 +452,6 @@ class Program
         }
     }
 
-    private static void ExecuteSQLCode(string messageText)
-    {
-        new DbRepo().Execute(messageText);
-    }
-
     private static async Task ShowPenalties(ITelegramBotClient botClient, CancellationToken cancellationToken,
         long chatId)
     {
@@ -518,8 +495,7 @@ class Program
             chatId: chatId,
             text,
             cancellationToken: cancellationToken).ConfigureAwait(false);
-
-
+        
         return text;
     }
 
