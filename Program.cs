@@ -276,6 +276,7 @@ class Program
     {
         try
         {
+            // commands with arguments
             if (messageText.ToLower().StartsWith("/s "))
             {
                 await SearchResults(botClient, cancellationToken, chatId, messageText);
@@ -394,11 +395,16 @@ class Program
                 case "/rrr":
                 {
                     var r = new DbRepo().GetRandom(100);
-                    string text = string.Join("\n", r.Select(x => x.ToString()));
-                    await botClient.SendMessage(
-                        chatId: chatId,
-                        text: "Ecco 100 avemanie per te. Ora vai a leggerle sulla carreggiata. \n" + text,
-                        cancellationToken: cancellationToken);
+                    for (int i = 0; i < 100; i += 10)
+                    {
+                        string text = string.Join("\n", r.Skip(i).Take(10)
+                            .Select(x => x.ToString()));
+                        
+                        await botClient.SendMessage(
+                            chatId: chatId,
+                            text: "\n" + text,
+                            cancellationToken: cancellationToken);
+                    }
                     break;
                 }
                 case "/db":
@@ -609,7 +615,7 @@ class Program
         CancellationToken cancellationToken)
     {
         Random random = new Random();
-        int randomNumber = random.Next(2, 8); // Generates a random integer between 1 and 7 inclusive.
+        int randomNumber = random.Next(3, 10); // Generates a random integer between 1 and 9 inclusive.
         var banDate = DateTime.Now.AddDays(randomNumber);
 
         if (userId != null)

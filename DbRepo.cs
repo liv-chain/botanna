@@ -230,9 +230,14 @@ public class DbRepo
         {
             connection.Open();
             string query = $@"
-                SELECT COUNT(*)
-                FROM {AmTableName}
-                WHERE author = @Author AND datetime >= @StartDate";
+            SELECT 
+                (SELECT COUNT(*) 
+                 FROM {AmTableName} 
+                 WHERE author = @Author AND datetime >= @StartDate) 
+                +
+                (SELECT COUNT(*) 
+                 FROM {PenaltyTableName} 
+                 WHERE author = @Author AND datetime >= @StartDate) AS totalCount";
 
             using (var command = new SQLiteCommand(query, connection))
             {
