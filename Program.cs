@@ -11,11 +11,10 @@ using Message = Telegram.Bot.Types.Message;
 // ReSharper disable once CheckNamespace
 class Program
 {
-    private static TelegramBotClient _botClient;
+    private static TelegramBotClient? _botClient;
     private static readonly string BotToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw";
     public static readonly long AmChatId = -1002381222429;
-    private static readonly string MalePoliceEmoji = "\U0001F46E\u200D\u2642\U0000FE0F"; // 👮‍♂️
-    private static Timer? _timer;
+    private static readonly string MalePoliceEmoji = "\U0001F46E\u200D\u2642\U0000FE0F"; // 👮‍♂️    
 
     static readonly List<string> Remarks =
     [
@@ -26,11 +25,14 @@ class Program
         "sei già al capitolo 3 del tuo libro di puttanate?",
         "minchia oh, non ci sei solo tu qua eh.",
         "vai a scavare buche nel Tagliamento.",
+        "merda secca per te.",
         "forse è il momento di passare la parola agli altri.",
         "vai a giocare con la merda nella tundra.",
         "palettaaaaaaaaaaaaaaaaa!",
         "mi piacerebbe sentire anche il punto di vista di qualcun altro di voi stronzetti.",
         "grazie per la tua passione, ma non hai un cazzo da fare oggi?",
+        "favorisci il libretto di circolazione che ci cago dentro.",
+        "beviti la benzina invece di circolare.",
         "puoi riassumere? Abbiamo poco tempo per leggere tutte le cagate che scrivi.",
         "hai coperto ogni dettaglio delle tue minchiate, possiamo passare al prossimo argomento?",
         "facciamo un break dalle minchiate, che dici?",
@@ -55,14 +57,14 @@ class Program
 
     static async Task Main(string[] args)
     {
-        await RunBot();
-        _timer = new Timer(async _ => await RestartBot(), null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
+        await RunBot();  
+        Console.ReadLine();
     }
 
     private static async Task RestartBot()
     {
         Console.WriteLine("Restarting bot...");
-        await _botClient.Close();
+        if (_botClient != null) await _botClient.Close();
         await RunBot();
     }
 
@@ -88,7 +90,11 @@ class Program
         try
         {
             var me = await _botClient.GetMe(cancellationToken: cts.Token);
-            Console.WriteLine($"Bot {me.Username} is up and running!");
+            
+            string assemblyVersion = typeof(Program).Assembly.GetName().Version?.ToString() ??
+                                     "Version not available";
+            
+            Console.WriteLine($"Bot {me.Username} version {assemblyVersion} is up and running!");
         }
         catch (Exception)
         {
@@ -196,31 +202,59 @@ class Program
                 repo.Add(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now));
             }
 
-            var limit = 3;
-            (bool hasExceeded, int count, DateTime? dt) checkResult = repo.HasAuthorExceededLimit(senderName, limit);
-            Console.WriteLine($"Exceeded: {checkResult.hasExceeded} - {checkResult.count}");
+            if (await CheckActivityArrest(botClient, cancellationToken, chatId, userId, senderName, repo)) return;
+            
+            await CheckPenaltyArrest(botClient, cancellationToken, chatId, userId, senderName, repo);
+        }
+    }
 
-            switch (checkResult.hasExceeded)
+    private static async Task CheckPenaltyArrest(ITelegramBotClient botClient, CancellationToken cancellationToken,
+        long chatId, long? userId, string senderName, DbRepo repo)
+    {
+        (bool hasExceeded, int count) checkPenalResult = repo.HasAuthorExceededPenalLimit(senderName);
+        Console.WriteLine($"Penalties exceeded: {checkPenalResult.hasExceeded} - penalties count {checkPenalResult.count}");
+        if (checkPenalResult.hasExceeded)
+        {
+            DateTime? banDate = await BanChatMember(botClient, chatId, userId, cancellationToken);
+            if (banDate.HasValue)
             {
-                case true when checkResult.count > limit + 1:
-                {
-                    DateTime? banDate = await BanChatMember(botClient, chatId, userId, cancellationToken);
-                    if (banDate.HasValue)
-                    {
-                        await botClient.SendMessage(
-                            chatId: chatId,
-                            text:
-                            $"{MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione fino al {banDate.Value:g} {MalePoliceEmoji}",
-                            cancellationToken: cancellationToken);
-                    }
-
-                    return;
-                }
-                case true:
-                    await RemarkUser(botClient, cancellationToken, chatId, senderName, checkResult.dt);
-                    break;
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text:
+                    $"{MalePoliceEmoji} ARRESTO per eccesso di multe: {senderName} sarà in prigione fino al {banDate.Value:g} {MalePoliceEmoji}",
+                    cancellationToken: cancellationToken);
             }
         }
+    }
+
+    private static async Task<bool> CheckActivityArrest(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId,
+        long? userId, string senderName, DbRepo repo)
+    {
+        var limit = 3;
+        (bool hasExceeded, int count, DateTime? dt) checkResult = repo.HasAuthorExceededLimit(senderName, limit);
+        Console.WriteLine($"Activity exceeded: {checkResult.hasExceeded} - activity count {checkResult.count}");
+        switch (checkResult.hasExceeded)
+        {
+            case true when checkResult.count > limit + 1:
+            {
+                DateTime? banDate = await BanChatMember(botClient, chatId, userId, cancellationToken);
+                if (banDate.HasValue)
+                {
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text:
+                        $"{MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione fino al {banDate.Value:g} {MalePoliceEmoji}",
+                        cancellationToken: cancellationToken);
+                }
+
+                return true;
+            }
+            case true:
+                await RemarkUser(botClient, cancellationToken, chatId, senderName, checkResult.dt);
+                break;
+        }
+
+        return false;
     }
 
     private static async Task RemarkUser(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId,
@@ -281,7 +315,7 @@ class Program
         try
         {
             // commands with arguments
-            if (messageText.ToLower().StartsWith("/s "))
+            if (messageText.ToLower().StartsWith("/s ") || messageText.ToLower().StartsWith("s "))
             {
                 await SearchResults(botClient, cancellationToken, chatId, messageText);
                 return;
@@ -495,7 +529,7 @@ class Program
             chatId: chatId,
             text,
             cancellationToken: cancellationToken).ConfigureAwait(false);
-        
+
         return text;
     }
 
@@ -591,7 +625,7 @@ class Program
         CancellationToken cancellationToken)
     {
         Random random = new Random();
-        int randomNumber = random.Next(3, 10); // Generates a random integer between 1 and 9 inclusive.
+        int randomNumber = random.Next(2, 10); 
         var banDate = DateTime.Now.AddDays(randomNumber);
 
         if (userId != null)

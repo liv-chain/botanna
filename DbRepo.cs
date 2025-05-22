@@ -13,6 +13,7 @@ public class DbRepo
     private const string AmTableName = "ave_mania";
     private const string PenaltyTableName = "penalties";
     private const int Hours = 12; // Number of hours to check for author exceeding limit
+    private const int PenaltyHoursTimeSpan = 24; // Number of hours to check for author exceeding limit
 
     private const string CreateTableQuery =
         $"CREATE TABLE IF NOT EXISTS {AmTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
@@ -68,7 +69,7 @@ public class DbRepo
     {
         Console.WriteLine("Importing data from unprocessed telegram messages...");
         var chatData = LoadTelegramChatDataFromJsonFiles();
-        await ImportChatData(chatData.Messages, botClient, cancellationToken);
+        if (chatData != null) await ImportChatData(chatData.Messages, botClient, cancellationToken);
     }
 
     private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, CancellationToken cancellationToken)
@@ -261,6 +262,36 @@ public class DbRepo
         }
 
         return (false, 0, null);
+    }    
+    
+    public (bool hasExceeded, int count) HasAuthorExceededPenalLimit(string author)
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            string query = $@"             
+                SELECT COUNT(*) 
+                 FROM {PenaltyTableName} 
+                 WHERE author = @Author AND datetime >= @StartDate"; 
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                command.Parameters.AddWithValue("@Author", author);
+                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddHours(-PenaltyHoursTimeSpan));
+                var result = command.ExecuteScalar();
+                if (result != null && int.TryParse(result.ToString(), out int count))
+                {
+                    bool exceeded = count > 2;
+                    if (exceeded)
+                    {
+                        Console.WriteLine($"Author {author} has exceeded the limit of 2 penalties in the last {PenaltyHoursTimeSpan} hours");
+                        return (exceeded, count);
+                    }
+                    return (exceeded, count);
+                }
+            }
+        }
+
+        return (false, 0);
     }
 
 
