@@ -1,5 +1,4 @@
 ﻿using System.Data.SQLite;
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using AveManiaBot.JsonData.Telegram;
 using Telegram.Bot;
@@ -92,7 +91,7 @@ public class DbRepo
                 // se esiste invia una multa todo 1
                 Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
                 Add(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
-                await SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
+                await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
                 
             }
             else
@@ -105,24 +104,7 @@ public class DbRepo
         }
 
     }
-
-    private static async Task<string> SendPenaltyMessage(ITelegramBotClient botClient,
-        CancellationToken cancellationToken,
-        string senderName, string messageText, DbRepo repo, [DisallowNull] int? originalAveManiaId)
-    {
-        AveMania? am = repo.Find(originalAveManiaId.Value);
-
-        string text =
-            $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f";
-
-        await botClient.SendMessage(
-            chatId: Program.AmChatId,
-            text,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-        
-        return text;
-    }
-
+    
 
     private TelegramChatData? LoadTelegramChatDataFromJsonFiles()
     {
