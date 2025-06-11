@@ -1,6 +1,6 @@
 ﻿namespace AveManiaBot;
 
-public class Helpers
+public static class Helpers
 {
     public static bool IsAveMania(string input)
     {

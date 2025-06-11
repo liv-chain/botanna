@@ -40,12 +40,13 @@ class Program
         "ma smettila di fare il gazzabbubbo di turno, che qui non siamo al circo!",
         "se continui a parlare così, finisci dritto dritto nel manuale del perfetto spruzzafuffa.",
         "ma sei proprio un mestolone di gorgoglione oggi, eh?",
+        "ti sgorfo negli occhi",
         "oh, gazzabbubbo ufficiale, la parola la passiamo anche agli altri o no?",
         "sembri un frastugliacazzi, vai avanti all’infinito!",
         "basta con questa manfrina da scatafasco ambulante!",
         "ma quanto hai bevuto dal calderone della logorrina oggi?",
         "Hai intenzione di brevettare questa infinita marea di cagate?",
-        "Va bene, ho capito, il mondo ruota intorno alla tua voce oggi!",
+        "Va bene, ho capito, il mondo ruota intorno alla tua voce sgradevole oggi!",
         "Non ti stanchi mai di sentire il suono delle tue stesse stronzate?",
         "Aspetta, fammi respirare tra una frase e l’altra minchia!",
         "Se parlassi un po’ di meno, potremmo forse risolvere questo problema prima di domani.",
@@ -215,13 +216,13 @@ class Program
         Console.WriteLine($"Penalties exceeded: {checkPenalResult.hasExceeded} - penalties count {checkPenalResult.count}");
         if (checkPenalResult.hasExceeded)
         {
-            DateTime? banDate = await BanChatMember(botClient, chatId, userId, cancellationToken);
+            (DateTime? banDate, int days) = await BanChatMember(botClient, chatId, userId, cancellationToken);
             if (banDate.HasValue)
             {
                 await botClient.SendMessage(
                     chatId: chatId,
                     text:
-                    $"{MalePoliceEmoji} ARRESTO per eccesso di multe: {senderName} sarà in prigione fino al {banDate.Value:g} {MalePoliceEmoji}",
+                    $"{MalePoliceEmoji} ARRESTO per eccesso di multe: {senderName} sarà in prigione per {days} giorni fino al {banDate.Value:g} {MalePoliceEmoji}",
                     cancellationToken: cancellationToken);
             }
         }
@@ -237,13 +238,12 @@ class Program
         {
             case true when checkResult.count > limit + 1:
             {
-                DateTime? banDate = await BanChatMember(botClient, chatId, userId, cancellationToken);
-                if (banDate.HasValue)
+                (DateTime? banDate, int days) = await BanChatMember(botClient, chatId, userId, cancellationToken);                if (banDate.HasValue)
                 {
                     await botClient.SendMessage(
                         chatId: chatId,
                         text:
-                        $"{MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione fino al {banDate.Value:g} {MalePoliceEmoji}",
+                        $"{MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione per {days} giorni fino al {banDate.Value:g} {MalePoliceEmoji}",
                         cancellationToken: cancellationToken);
                 }
 
@@ -327,10 +327,10 @@ class Program
                 return;
             }
 
-            if (messageText.ToLower().StartsWith("/ech "))
+            if (messageText.ToLower().StartsWith("ech "))
             {
                 await TriggerBotMessage(botClient, AmChatId,
-                    messageText.Replace("/ech ", "", StringComparison.OrdinalIgnoreCase), cancellationToken);
+                    messageText.Replace("ech ", "", StringComparison.OrdinalIgnoreCase), cancellationToken);
                 return;
             }
 
@@ -373,7 +373,7 @@ class Program
                         text: "Duplicati eliminati con successo!",
                         cancellationToken: cancellationToken);
                     break;
-                case "/c":
+                case "c":
                 {
                     var count = new DbRepo().Count();
                     await botClient.SendMessage(
@@ -382,22 +382,22 @@ class Program
                         cancellationToken: cancellationToken);
                     break;
                 }
-                case "/act":
+                case "act":
                 {
                     await ShowActivity(botClient, cancellationToken, chatId);
                     break;
                 }
-                case "/killme":
+                case "killme":
                 {
                     await botClient.Close(cancellationToken: cancellationToken);
                     break;
                 }
-                case "/p":
+                case "p":
                 {
                     await ShowPenalties(botClient, cancellationToken, chatId);
                     break;
                 }
-                case "/r":
+                case "r":
                 {
                     var r = new DbRepo().GetRandom(3);
                     string text = string.Join("\n", r.Select(x => x.ToString()));
@@ -407,7 +407,7 @@ class Program
                         cancellationToken: cancellationToken);
                     break;
                 }
-                case "/rrr":
+                case "rrr":
                 {
                     var r = new DbRepo().GetRandom(100);
                     for (int i = 0; i < 100; i += 10)
@@ -423,12 +423,12 @@ class Program
 
                     break;
                 }
-                case "/db":
+                case "db":
                 {
                     await SendDatabaseFile(botClient, cancellationToken, chatId);
                     break;
                 }
-                case "/v":
+                case "v":
                 {
                     string assemblyVersion = typeof(Program).Assembly.GetName().Version?.ToString() ??
                                              "Version not available";
@@ -438,7 +438,7 @@ class Program
                         cancellationToken: cancellationToken);
                     break;
                 }
-                case "/d":
+                case "d":
                 {
                     DbRepo repo = new DbRepo();
                     List<AveMania> results = repo.GetLast(24);
@@ -465,14 +465,14 @@ class Program
                     await botClient.SendMessage(
                         chatId: chatId,
                         text: "Comandi disponibili:\n" +
-                              "/s AVEMANIA - Cerca le avemanie - utile per evitare le multe\n" +
-                              "/c - Conta le avemanie\n" +
-                              "/p - Mostra i dati sulle multe\n" +
-                              "/d - Mostra le avemanie delle ultime 24 ore\n" +
-                              "/r - Restituisce 3 avemanie a caso\n" +
-                              "/rrr - Restituisce 100 avemanie a caso\n" +
-                              "/v - Numero di versione\n" +
-                              "/db - Scarica il db",
+                              "s AVEMANIA - Cerca le avemanie - utile per evitare le multe\n" +
+                              "c - Conta le avemanie\n" +
+                              "p - Mostra i dati sulle multe\n" +
+                              "d - Mostra le avemanie delle ultime 24 ore\n" +
+                              "r - Restituisce 3 avemanie a caso\n" +
+                              "rrr - Restituisce 100 avemanie a caso\n" +
+                              "v - Numero di versione\n" +
+                              "db - Scarica il db",
                         cancellationToken: cancellationToken);
                     break;
             }
@@ -621,7 +621,15 @@ class Program
         }
     }
 
-    static async Task<DateTime?> BanChatMember(ITelegramBotClient botClient, long chatId, long? userId,
+    /// <summary>
+    /// todo_1 gestire ban admin
+    /// </summary>
+    /// <param name="botClient"></param>
+    /// <param name="chatId"></param>
+    /// <param name="userId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    static async Task<(DateTime? banDate, int randomNumber)> BanChatMember(ITelegramBotClient botClient, long chatId, long? userId,
         CancellationToken cancellationToken)
     {
         Random random = new Random();
@@ -644,10 +652,10 @@ class Program
                     CanPinMessages = false
                 }, false, banDate, cancellationToken);
 
-            return banDate;
+            return (banDate, randomNumber);
         }
 
-        return null;
+        return (null, 0);
     }
 
     private static Task HandleError(ITelegramBotClient botClient, Exception exception,
