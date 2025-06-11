@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using AveManiaBot;
+using AveManiaBot.Exceptions;
 using Polly;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
@@ -161,7 +162,18 @@ class Program
         // Check if the message is from a group
         if (chatType == ChatType.Group || chatType == ChatType.Supergroup)
         {
-            await HandleGroupMessage(botClient, cancellationToken, chatId, userId, senderName, messageText);
+            try
+            {
+                await HandleGroupMessage(botClient, cancellationToken, chatId, userId, senderName, messageText);
+            }
+            catch (PorcodioException e)
+            {
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text:
+                    $"{MalePoliceEmoji} ARRESTO per {senderName} fallito. Sarà tuttavia moralmente obbligato a non scrivere nulla per {e.Days} giorni fino al {e.BanDate:g} {MalePoliceEmoji}",
+                    cancellationToken: cancellationToken);
+            }
         }
         else
         {
@@ -638,19 +650,27 @@ class Program
 
         if (userId != null)
         {
-            await botClient.RestrictChatMember(
-                chatId: chatId,
-                userId: userId.Value,
-                permissions: new ChatPermissions
-                {
-                    CanSendMessages = false, // User can't send messages
-                    CanSendPolls = false,
-                    CanSendOtherMessages = false,
-                    CanAddWebPagePreviews = false,
-                    CanChangeInfo = false,
-                    CanInviteUsers = false,
-                    CanPinMessages = false
-                }, false, banDate, cancellationToken);
+            try
+            {
+                await botClient.RestrictChatMember(
+                    chatId: chatId,
+                    userId: userId.Value,
+                    permissions: new ChatPermissions
+                    {
+                        CanSendMessages = false, // User can't send messages
+                        CanSendPolls = false,
+                        CanSendOtherMessages = false,
+                        CanAddWebPagePreviews = false,
+                        CanChangeInfo = false,
+                        CanInviteUsers = false,
+                        CanPinMessages = false
+                    }, false, banDate, cancellationToken);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw new PorcodioException($"Non è stato possibile arrestare l'utente: {e.Message}", banDate, randomNumber);
+            }
 
             return (banDate, randomNumber);
         }
