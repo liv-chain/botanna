@@ -136,7 +136,7 @@ public class MessageHandler(ITelegramBotClient botClient)
                 }
                 case "p":
                 {
-                    await ShowPenalties(botClient, cancellationToken, chatId);
+                    await ShowPenalties(cancellationToken, chatId);
                     break;
                 }
                 case "r":
@@ -244,7 +244,7 @@ public class MessageHandler(ITelegramBotClient botClient)
             cancellationToken: cancellationToken);
     }
 
-    private static async Task ShowPenalties(ITelegramBotClient botClient, CancellationToken cancellationToken,
+    private async Task ShowPenalties(CancellationToken cancellationToken,
         long chatId)
     {
         var penaltiesForAuthor = new DbRepo().GetPenaltiesForAllAuthors();
@@ -256,6 +256,31 @@ public class MessageHandler(ITelegramBotClient botClient)
         }
 
         string text = penaltiesForAuthor.Aggregate(string.Empty, GetDesc);
+        text += "Percentuale di multe";
+        text += "\n\n";
+
+        var ratios = new DbRepo().GetPenaltiesRatioStats();
+        var count = ratios.Count(r => r.Value > 0);
+        
+        var ordered = ratios.Where(r => r.Value > 0)
+            .OrderBy(kv => kv.Value)
+            .Select((kv, index) =>
+            {
+                
+                string medal = index switch
+                {
+                    0 => "🥇 ",
+                    1 => "🥈 ",
+                    2 => "🥉 ",
+                    _ when index >= count - 3 => "💩 ",
+                    _ => ""
+                };
+                string author = string.IsNullOrEmpty(kv.Key) ? "Unknown" : kv.Key;
+                string percentage = kv.Value.ToString("P");
+                return $"{medal} {author,-20} → {percentage}";
+            });
+
+        text += string.Join("\n", ordered);
 
         await botClient.SendMessage(
             chatId: chatId,

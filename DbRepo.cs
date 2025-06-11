@@ -92,19 +92,16 @@ public class DbRepo
                 Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
                 Add(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
                 await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
-                
             }
             else
             {
                 // se non esiste inserisci una ave mania
                 Add(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
                 Console.WriteLine($"Message does not exist in the database. Adding an AveMania message.");
-                
             }
         }
-
     }
-    
+
 
     private TelegramChatData? LoadTelegramChatDataFromJsonFiles()
     {
@@ -244,8 +241,8 @@ public class DbRepo
         }
 
         return (false, 0, null);
-    }    
-    
+    }
+
     public (bool hasExceeded, int count) HasAuthorExceededPenalLimit(string author)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
@@ -254,7 +251,7 @@ public class DbRepo
             string query = $@"             
                 SELECT COUNT(*) 
                  FROM {PenaltyTableName} 
-                 WHERE author = @Author AND datetime >= @StartDate"; 
+                 WHERE author = @Author AND datetime >= @StartDate";
             using (var command = new SQLiteCommand(query, connection))
             {
                 command.Parameters.AddWithValue("@Author", author);
@@ -268,6 +265,7 @@ public class DbRepo
                         Console.WriteLine($"Author {author} has exceeded the limit of 2 penalties in the last {PenaltyHoursTimeSpan} hours");
                         return (exceeded, count);
                     }
+
                     return (exceeded, count);
                 }
             }
@@ -504,7 +502,7 @@ public class DbRepo
 
         return results;
     }
-    
+
     public Dictionary<string, int> GetPenaltiesForAllAuthors()
     {
         using (var connection = new SQLiteConnection(ConnectionString))
@@ -578,10 +576,15 @@ public class DbRepo
                         int aveManiaCount = Convert.ToInt32(reader["aveManiaCount"]);
                         int penaltyCount = Convert.ToInt32(reader["penaltyCount"]);
 
-                        // Calculate the ratio;
-                        // avoid division by zero
-                        double ratio = aveManiaCount > 0 ? penaltyCount / (double)aveManiaCount : 0;
-                        authorRatios[author] = ratio;
+                        if (aveManiaCount < 10)
+                        {
+                            authorRatios[author] = 0;
+                        }
+                        else
+                        {
+                            double ratio = aveManiaCount > 0 ? penaltyCount / (double)aveManiaCount : 0;
+                            authorRatios[author] = ratio;
+                        }
                     }
                 }
             }
