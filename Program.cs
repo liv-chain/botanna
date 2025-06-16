@@ -117,25 +117,27 @@ class Program
         if (!string.IsNullOrEmpty(message.From?.LastName))
             senderName += $" {message.From?.LastName}";
 
-        // Check if the message is from a group
-        if (chatType == ChatType.Group || chatType == ChatType.Supergroup)
+        switch (chatType)
         {
-            try
-            {
-                await new MessageHandler(botClient).HandleGroupMessage(cancellationToken, chatId, userId, senderName, messageText);
-            }
-            catch (PorcodioGliAdminException e)
-            {
-                await botClient.SendMessage(
-                    chatId: chatId,
-                    text:
-                    $"{AmConstants.MalePoliceEmoji} ARRESTO per {senderName} fallito. Sarà tuttavia moralmente obbligato a non scrivere nulla per {e.Days} giorni fino al {e.BanDate:g} {AmConstants.MalePoliceEmoji}",
-                    cancellationToken: cancellationToken);
-            }
-        }
-        else
-        {
-            await new MessageHandler(botClient).HandlePrivateMessage(cancellationToken, chatId, messageText);
+            case ChatType.Group:
+            case ChatType.Supergroup:
+                try
+                {
+                    await new MessageHandler(botClient).HandleGroupMessage(cancellationToken, chatId, userId, senderName, messageText);
+                }
+                catch (PorcodioGliAdminException e)
+                {
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text:
+                        $"{AmConstants.MalePoliceEmoji} ARRESTO per {senderName} fallito. Sarà tuttavia moralmente obbligato a non scrivere nulla per {e.Days} giorni fino al {e.BanDate:g} {AmConstants.MalePoliceEmoji}",
+                        cancellationToken: cancellationToken);
+                }
+
+                break;
+            default:
+                await new MessageHandler(botClient).HandlePrivateMessage(cancellationToken, chatId, messageText);
+                break;
         }
     }
 

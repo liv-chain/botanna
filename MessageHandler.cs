@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using static AveManiaBot.MessageHelper;
@@ -71,7 +72,7 @@ public class MessageHandler(ITelegramBotClient botClient)
 
             if (messageText.ToLower().StartsWith("ech "))
             {
-                await TriggerBotMessage(botClient, AmConstants.AmChatId,
+                await Echo(botClient, AmConstants.AmChatId,
                     messageText.Replace("ech ", "", StringComparison.OrdinalIgnoreCase), cancellationToken);
                 return;
             }
@@ -122,6 +123,11 @@ public class MessageHandler(ITelegramBotClient botClient)
                         chatId: chatId,
                         text: $"Sono state scritte {count} avemanie \ud83d\ude0a",
                         cancellationToken: cancellationToken);
+                    break;
+                }
+                case "ca":
+                {
+                    await ShowCountStats(cancellationToken, chatId);
                     break;
                 }
                 case "act":
@@ -228,6 +234,37 @@ public class MessageHandler(ITelegramBotClient botClient)
         }
     }
 
+    private async Task ShowCountStats(CancellationToken cancellationToken, long chatId)
+    {
+        Dictionary<string, int> countStatsForAuthor = await new DbRepo().GetAveManiaCountPerAuthor();
+        var ordered = countStatsForAuthor
+            .OrderByDescending(kv => kv.Value)
+            .Select((kv, index) =>
+            {
+                string medal = index switch
+                {
+                    0 => "🥇 ",
+                    1 => "🥈 ",
+                    2 => "🥉 ",
+                    _ => ""
+                };
+                string author = string.IsNullOrEmpty(kv.Key) ? "Unknown" : kv.Key;
+                return $"{medal} {author,-20} → {kv.Value}";
+            });
+        
+        var sb = new StringBuilder();
+        foreach (var line in ordered)
+        {
+            sb.AppendLine(line);
+        }
+
+        await botClient.SendMessage(
+            chatId: chatId,
+            sb.ToString(),
+            cancellationToken: cancellationToken);
+        
+    }
+
 
     /// <summary>
     /// Triggers the bot to send a message to a specific chat.
@@ -235,7 +272,8 @@ public class MessageHandler(ITelegramBotClient botClient)
     /// <param name="botClient"></param>
     /// <param name="chatId">The unique identifier for the chat.</param>
     /// <param name="message">The message to send to the chat.</param>
-    static async Task TriggerBotMessage(ITelegramBotClient botClient, long chatId, string message,
+    /// <param name="cancellationToken"></param>
+    private static async Task Echo(ITelegramBotClient botClient, long chatId, string message,
         CancellationToken cancellationToken)
     {
         await botClient.SendMessage(
@@ -244,29 +282,29 @@ public class MessageHandler(ITelegramBotClient botClient)
             cancellationToken: cancellationToken);
     }
 
-    private async Task ShowPenalties(CancellationToken cancellationToken,
-        long chatId)
+    private async Task ShowPenalties(CancellationToken cancellationToken, long chatId)
     {
         var penaltiesForAuthor = new DbRepo().GetPenaltiesForAllAuthors();
+        var sb = new StringBuilder();
 
-        string GetDesc(string current, KeyValuePair<string, int> author)
+        foreach (var author in penaltiesForAuthor)
         {
             string authorName = string.IsNullOrEmpty(author.Key) ? "Sconosciuto" : author.Key;
-            return current + $"{authorName} ha preso {author.Value} multe\n";
+            sb.AppendLine($"{authorName} ha preso {author.Value} multe");
         }
 
-        string text = penaltiesForAuthor.Aggregate(string.Empty, GetDesc);
-        text += "Percentuale di multe";
-        text += "\n\n";
+        sb.AppendLine();
+        sb.AppendLine("Percentuale di multe");
+        sb.AppendLine();
 
         var ratios = new DbRepo().GetPenaltiesRatioStats();
-        var count = ratios.Count(r => r.Value > 0);
-        
-        var ordered = ratios.Where(r => r.Value > 0)
+        var positiveRatios = ratios.Where(r => r.Value > 0).ToList();
+        var count = positiveRatios.Count;
+
+        var ordered = positiveRatios
             .OrderBy(kv => kv.Value)
             .Select((kv, index) =>
             {
-                
                 string medal = index switch
                 {
                     0 => "🥇 ",
@@ -280,18 +318,21 @@ public class MessageHandler(ITelegramBotClient botClient)
                 return $"{medal} {author,-20} → {percentage}";
             });
 
-        text += string.Join("\n", ordered);
+        foreach (var line in ordered)
+        {
+            sb.AppendLine(line);
+        }
 
         await botClient.SendMessage(
             chatId: chatId,
-            text,
+            sb.ToString(),
             cancellationToken: cancellationToken);
     }
+
 
     /// <summary>
     /// Sends a notification message to the chat when a duplicate message is detected, indicating the original author and timestamp.
     /// </summary>
-    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
     /// <param name="cancellationToken">Propagates notification that the operation should be canceled.</param>
     /// <param name="chatId">The unique identifier of the chat where the message needs to be sent.</param>
     /// <param name="senderName">The name of the user who sent the duplicate message.</param>
@@ -304,8 +345,14 @@ public class MessageHandler(ITelegramBotClient botClient)
     {
         AveMania? am = repo.Find(originalAveManiaId.Value);
 
+        var auth = am?.Author;
+        if (string.IsNullOrWhiteSpace(auth))
+        {
+            auth = "Utente Facebook";
+        }
+        
         string text =
-            $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f";
+            $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {auth} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f";
 
         await botClient.SendMessage(
             chatId: chatId,

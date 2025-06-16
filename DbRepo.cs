@@ -88,7 +88,6 @@ public class DbRepo
             int? existingMessageId = Check(message);
             if (existingMessageId.HasValue)
             {
-                // se esiste invia una multa todo 1
                 Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
                 Add(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
                 await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
@@ -546,6 +545,41 @@ public class DbRepo
 
         Console.WriteLine("SQL command executed successfully.");
     }
+    
+    public async Task<Dictionary<string, int>> GetAveManiaCountPerAuthor()
+    {
+        Dictionary<string, int> authorCounts = new();
+
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            string query = $@"
+            SELECT author, COUNT(*) AS messageCount
+            FROM {AmTableName}
+            WHERE datetime >= @startDate
+            GROUP BY author";
+
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                DateTime startDate = new DateTime(2025, 1, 15);
+                command.Parameters.AddWithValue("@startDate", startDate);
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        string author = reader["author"].ToString() ?? string.Empty;
+                        author = author.Replace(' ', '~');
+                        int count = Convert.ToInt32(reader["messageCount"]);
+                        authorCounts[author] = count;
+                    }
+                }
+            }
+        }
+
+        return authorCounts;
+    }
+
 
     public Dictionary<string, double> GetPenaltiesRatioStats()
     {
