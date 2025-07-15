@@ -41,6 +41,9 @@
       <None Update="ave_mania.db">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
+      <None Update="ave_mania__.db">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
     <ItemGroup>

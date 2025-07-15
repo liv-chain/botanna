@@ -2,17 +2,16 @@
 using System.Text.Json;
 using AveManiaBot.JsonData.Telegram;
 using Telegram.Bot;
+using static AveManiaBot.AmConstants;
 
 namespace AveManiaBot;
 
 public class DbRepo
 {
-    private const string DbPath = "ave_mania.db";
-    private const string ConnectionString = $"Data Source={DbPath};Version=3;";
     private const string AmTableName = "ave_mania";
     private const string PenaltyTableName = "penalties";
     private const int Hours = 12; // Number of hours to check for author exceeding limit
-    private const int PenaltyHoursTimeSpan = 24; // Number of hours to check for author exceeding limit
+    private const int PenaltyHoursTimeSpan = 36; // Number of hours to check for author exceeding limit
 
     private const string CreateTableQuery =
         $"CREATE TABLE IF NOT EXISTS {AmTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
@@ -20,11 +19,13 @@ public class DbRepo
     private const string CreatePenaltyTableQuery =
         $"CREATE TABLE IF NOT EXISTS {PenaltyTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
 
-    private const string InsertQuery =
-        $"INSERT INTO {AmTableName} (message, author, datetime) VALUES (@message, @author, @datetime)";
+    private const string InsertCommand =
+        $"INSERT INTO {AmTableName} (message, author, datetime, messageId) VALUES (@message, @author, @datetime, @messageId)";
 
-    private const string InsertPenaltyQuery =
+    private const string InsertPenaltyCommand =
         $"INSERT INTO {PenaltyTableName} (message, author, datetime) VALUES (@message, @author, @datetime)";
+    
+    const string UpdateMessageCommand = $"UPDATE {AmTableName} SET message = @message WHERE messageId = @messageId";
 
     private const string SelectQuery = $"SELECT * FROM {AmTableName}";
     private const string CountQuery = $"SELECT COUNT(*) FROM {AmTableName}";
@@ -64,42 +65,49 @@ public class DbRepo
     /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests during the asynchronous operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    public async Task ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken)
-    {
-        Console.WriteLine("Importing data from unprocessed telegram messages...");
-        var chatData = LoadTelegramChatDataFromJsonFiles();
-        if (chatData != null) await ImportChatData(chatData.Messages, botClient, cancellationToken);
-    }
+    // public async Task ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken)
+    // {
+    //     Console.WriteLine("Importing data from unprocessed telegram messages...");
+    //     var chatData = LoadTelegramChatDataFromJsonFiles();
+    //     if (chatData != null) await ImportChatData(chatData.Messages, botClient, cancellationToken);
+    // }
 
-    private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, CancellationToken cancellationToken)
-    {
-        var lastMessageDateTime = GetLastMessageDateTime();
-        long unixTime = ((DateTimeOffset)lastMessageDateTime!).ToUnixTimeSeconds();
-
-        var messages = chatDataMessages.Where(m => long.Parse(m.DateUnixtime) > unixTime);
-        foreach (AveManiaBot.JsonData.Telegram.Message m in messages)
-        {
-            // verifica se è già nel db
-            string message = m.Text!;
-
-            bool isAm = Helpers.IsAveMania(message);
-            if (!isAm) continue;
-
-            int? existingMessageId = Check(message);
-            if (existingMessageId.HasValue)
-            {
-                Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
-                Add(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
-                await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
-            }
-            else
-            {
-                // se non esiste inserisci una ave mania
-                Add(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
-                Console.WriteLine($"Message does not exist in the database. Adding an AveMania message.");
-            }
-        }
-    }
+    // private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, 
+    //     CancellationToken cancellationToken)
+    // {
+    //     var lastMessageDateTime = GetLastMessageDateTime();
+    //     long unixTime = ((DateTimeOffset)lastMessageDateTime!).ToUnixTimeSeconds();
+    //
+    //     var messages = chatDataMessages.Where(m => long.Parse(m.DateUnixtime) > unixTime);
+    //     foreach (AveManiaBot.JsonData.Telegram.Message m in messages)
+    //     {
+    //         // verifica se è già nel db
+    //         string message = m.Text!;
+    //
+    //         bool isAm = Helpers.IsAveMania(message);
+    //         if (!isAm) continue;
+    //
+    //         int? existingMessageId = CheckPenalty(message);
+    //         if (existingMessageId.HasValue)
+    //         {
+    //             Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
+    //             if (m is { Text: not null, From: not null })
+    //             {
+    //                 Insert(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
+    //                 await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
+    //             }
+    //         }
+    //         else
+    //         {
+    //             // se non esiste inserisci una ave mania
+    //             if (m.From != null)
+    //             {
+    //                 Insert(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now, m.MessageId));
+    //             }
+    //             Console.WriteLine($"Message does not exist in the database. Adding an AveMania message.");
+    //         }
+    //     }
+    // }
 
 
     private TelegramChatData? LoadTelegramChatDataFromJsonFiles()
@@ -122,8 +130,8 @@ public class DbRepo
                 if (Helpers.IsAveMania(mess.content))
                 {
                     AveMania aveMania = new(mess.content, mess.sender_name, mess.timestamp_ms,
-                        DateTime.Now);
-                    using var command = new SQLiteCommand(InsertQuery, connection);
+                        DateTime.Now, mess.message_id);
+                    using var command = new SQLiteCommand(InsertCommand, connection);
                     command.Parameters.AddWithValue("@message", aveMania.Message);
                     command.Parameters.AddWithValue("@author", aveMania.Author);
                     command.Parameters.AddWithValue("@datetime", DateTime.Now);
@@ -164,18 +172,21 @@ public class DbRepo
         if (reader.Read())
         {
             DateTime.TryParse(reader["datetime"].ToString(), out var dateTime);
+            int.TryParse(reader["messageId"].ToString(), out var messageId);
+            
             return new AveMania(
                 reader["message"].ToString() ?? string.Empty,
                 reader["author"].ToString() ?? string.Empty,
                 0,
-                dateTime
+                dateTime, 
+                messageId
             );
         }
 
         return null;
     }
 
-    public List<AveMania> FindMessagesContaining(string searchText)
+    public List<AveMania> FindMessagesContaining(string searchText) 
     {
         List<AveMania> results = new();
         using var connection = new SQLiteConnection(ConnectionString);
@@ -191,19 +202,21 @@ public class DbRepo
             {
                 dateTime = parsedDateTime;
             }
+            int.TryParse(reader["message_id"].ToString(), out var messageId);
 
             results.Add(new AveMania(
                 reader["message"].ToString() ?? string.Empty,
                 reader["author"].ToString() ?? string.Empty,
                 0,
-                dateTime
+                dateTime,
+                messageId
             ));
         }
 
         return results;
     }
 
-    public (bool hasExceeded, int count, DateTime?) HasAuthorExceededLimit(string author, int limit)
+    public (bool hasExceeded, int count, DateTime?) HasAuthorExceededLimit(string author, int limit, DateTime messageDateTime)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -221,7 +234,7 @@ public class DbRepo
             using (var command = new SQLiteCommand(query, connection))
             {
                 command.Parameters.AddWithValue("@Author", author);
-                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddHours(-Hours));
+                command.Parameters.AddWithValue("@StartDate", messageDateTime.AddHours(-Hours)); 
                 var result = command.ExecuteScalar();
                 if (result != null && int.TryParse(result.ToString(), out int count))
                 {
@@ -242,7 +255,7 @@ public class DbRepo
         return (false, 0, null);
     }
 
-    public (bool hasExceeded, int count) HasAuthorExceededPenalLimit(string author)
+    public (bool hasExceeded, int count) HasAuthorExceededPenalLimit(string author, DateTime messageDateTime)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -254,11 +267,11 @@ public class DbRepo
             using (var command = new SQLiteCommand(query, connection))
             {
                 command.Parameters.AddWithValue("@Author", author);
-                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddHours(-PenaltyHoursTimeSpan));
+                command.Parameters.AddWithValue("@StartDate", messageDateTime.AddHours(-PenaltyHoursTimeSpan));
                 var result = command.ExecuteScalar();
                 if (result != null && int.TryParse(result.ToString(), out int count))
                 {
-                    bool exceeded = count > 2;
+                    bool exceeded = count > PenaltyLimit;
                     if (exceeded)
                     {
                         Console.WriteLine($"Author {author} has exceeded the limit of 2 penalties in the last {PenaltyHoursTimeSpan} hours");
@@ -303,7 +316,15 @@ public class DbRepo
         return null;
     }
 
-    public int? Check(string messageText)
+    /// <summary>
+    /// Checks if a message with the specified text already exists in the database
+    /// and retrieves its corresponding identifier.
+    /// </summary>
+    /// <param name="messageText">The text of the message to check for existence in the database.</param>
+    /// <returns>
+    /// The identifier of the existing message if found, or null if the message is not present in the database.
+    /// </returns>
+    public int? CheckPenalty(string messageText)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -338,27 +359,28 @@ public class DbRepo
         return null;
     }
 
-    public void Add(AveMania aveMania)
+    public static void Insert(AveMania aveMania)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
             connection.Open();
-            using (var command = new SQLiteCommand(InsertQuery, connection))
+            using (var command = new SQLiteCommand(InsertCommand, connection))
             {
                 command.Parameters.AddWithValue("@message", aveMania.Message);
                 command.Parameters.AddWithValue("@author", aveMania.Author);
                 command.Parameters.AddWithValue("@datetime", aveMania.DateTime);
+                command.Parameters.AddWithValue("@messageId", aveMania.MessageId);
                 command.ExecuteNonQuery();
             }
         }
     }
 
-    public void Add(Penalty penalty)
+    public void Insert(Penalty penalty)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
             connection.Open();
-            using (var command = new SQLiteCommand(InsertPenaltyQuery, connection))
+            using (var command = new SQLiteCommand(InsertPenaltyCommand, connection))
             {
                 command.Parameters.AddWithValue("@message", penalty.Message);
                 command.Parameters.AddWithValue("@author", penalty.Author);
@@ -424,11 +446,14 @@ public class DbRepo
                     while (reader.Read())
                     {
                         DateTime.TryParse(reader["datetime"].ToString(), out var dateTime);
+                        
+                        int.TryParse(reader["messageId"].ToString(), out var messageId);
                         randomAveManias.Add(new AveMania(
                             reader["message"].ToString() ?? string.Empty,
                             reader["author"].ToString() ?? string.Empty,
                             0,
-                            dateTime
+                            dateTime,
+                            messageId
                         ));
                     }
                 }
@@ -488,11 +513,13 @@ public class DbRepo
                     while (reader.Read())
                     {
                         DateTime.TryParse(reader["datetime"].ToString(), out var dateTime);
+                        int.TryParse(reader["messageId"].ToString(), out var messageId);
                         results.Add(new AveMania(
                             reader["message"].ToString() ?? string.Empty,
                             reader["author"].ToString() ?? string.Empty,
                             0,
-                            dateTime
+                            dateTime,
+                            messageId
                         ));
                     }
                 }
@@ -651,4 +678,95 @@ public class DbRepo
 
         return null;
     }
+
+    /// <summary>
+    /// Update the message column with the value of newAm where messageId matches the parameter
+    /// </summary>
+    /// <param name="messageId">The id of the message to be updated</param>
+    /// <param name="newMessage">The new value to update the message column with</param>
+    public async Task Update(int messageId, string newMessage)
+    {
+        await using var connection = new SQLiteConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new SQLiteCommand(UpdateMessageCommand, connection);
+        command.Parameters.AddWithValue("@message", newMessage);
+        command.Parameters.AddWithValue("@messageId", messageId);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Get the original text from am_table based on message id
+    /// </summary>
+    /// <param name="messageId"></param>
+    /// <returns></returns>
+    public string GetOriginalText(int messageId)
+    {
+        using var connection = new SQLiteConnection(ConnectionString);
+        connection.Open();
+
+        string query = $"SELECT message FROM {AmTableName} WHERE messageId = @messageId";
+        using var command = new SQLiteCommand(query, connection);
+        command.Parameters.AddWithValue("@messageId", messageId);
+        
+        var am = command.ExecuteScalar();
+        return am?.ToString() ?? string.Empty;
+    }
+    
+    public void EnsureSchemaAndUpdate()
+    {
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+
+            // Check if the `messageId` column exists, if not, add it
+            var checkMessageIdColumnQuery = $"PRAGMA table_info({AmTableName});";
+            using (var command = new SQLiteCommand(checkMessageIdColumnQuery, connection))
+            using (var reader = command.ExecuteReader())
+            {
+                bool hasMessageIdColumn = false;
+                while (reader.Read())
+                {
+                    if (reader["name"].ToString() == "messageId")
+                    {
+                        hasMessageIdColumn = true;
+                        break;
+                    }
+                }
+
+                if (!hasMessageIdColumn)
+                {
+                    var addMessageIdColumnQuery = $"ALTER TABLE {AmTableName} ADD COLUMN messageId INTEGER;";
+                    using (var addColumnCommand = new SQLiteCommand(addMessageIdColumnQuery, connection))
+                    {
+                        addColumnCommand.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            // Check if the `score` column exists, if not, add it
+            using (var command = new SQLiteCommand(checkMessageIdColumnQuery, connection))
+            using (var reader = command.ExecuteReader())
+            {
+                bool hasScoreColumn = false;
+                while (reader.Read())
+                {
+                    if (reader["name"].ToString() == "score")
+                    {
+                        hasScoreColumn = true;
+                        break;
+                    }
+                }
+
+                if (!hasScoreColumn)
+                {
+                    var addScoreColumnQuery = $"ALTER TABLE {AmTableName} ADD COLUMN score INTEGER;";
+                    using (var addColumnCommand = new SQLiteCommand(addScoreColumnQuery, connection))
+                    {
+                        addColumnCommand.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
+    }
+
 }

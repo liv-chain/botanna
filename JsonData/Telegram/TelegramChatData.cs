@@ -31,5 +31,7 @@ public class Message
     [JsonPropertyName("text")]
     [JsonConverter(typeof(TextFieldConverter))]
     public string? Text { get; set; }
-    
+
+    [JsonPropertyName("message_id")] 
+    public int MessageId { get; set; }
 }

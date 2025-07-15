@@ -7,34 +7,9 @@ namespace AveManiaBot;
 
 public class MessageHelper
 {
-    public static async Task<bool> CheckActivityArrest(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId,
-        long? userId, string senderName, DbRepo repo)
+    public static (bool hasExceeded, int count, DateTime?) CheckActivityArrest(string senderName, DbRepo repo, DateTime messageDateTime)
     {
-        var limit = 3;
-        (bool hasExceeded, int count, DateTime? dt) checkResult = repo.HasAuthorExceededLimit(senderName, limit);
-        Console.WriteLine($"Activity exceeded: {checkResult.hasExceeded} - activity count {checkResult.count}");
-        switch (checkResult.hasExceeded)
-        {
-            case true when checkResult.count > limit + 1:
-            {
-                (DateTime? banDate, int days) = await BanChatMember(botClient, chatId, userId, cancellationToken);
-                if (banDate.HasValue)
-                {
-                    await botClient.SendMessage(
-                        chatId: chatId,
-                        text:
-                        $"{AmConstants.MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione per {days} giorni fino al {banDate.Value:g} {AmConstants.MalePoliceEmoji}",
-                        cancellationToken: cancellationToken);
-                }
-
-                return true;
-            }
-            case true:
-                await RemarkUser(botClient, cancellationToken, chatId, senderName, checkResult.dt);
-                break;
-        }
-
-        return false;
+        return repo.HasAuthorExceededLimit(senderName, AmConstants.ActivityWarningLimit, messageDateTime);
     }
 
 
@@ -45,14 +20,12 @@ public class MessageHelper
     /// <param name="chatId"></param>
     /// <param name="userId"></param>
     /// <param name="cancellationToken"></param>
+    /// <param name="banDate"></param>
+    /// <param name="days"></param>
     /// <returns></returns>
-    static async Task<(DateTime? banDate, int randomNumber)> BanChatMember(ITelegramBotClient botClient, long chatId, long? userId,
-        CancellationToken cancellationToken)
+    public static async Task BanChatMember(ITelegramBotClient botClient, long chatId, long? userId,
+        CancellationToken cancellationToken, DateTime banDate, int days)
     {
-        Random random = new Random();
-        int randomNumber = random.Next(2, 10);
-        var banDate = DateTime.Now.AddDays(randomNumber);
-
         if (userId != null)
         {
             try
@@ -74,16 +47,13 @@ public class MessageHelper
             catch (Exception e)
             {
                 Console.WriteLine(e);
-                throw new PorcodioGliAdminException($"Non è stato possibile arrestare l'utente: {e.Message}", banDate, randomNumber);
+                throw new PorcodioGliAdminException($"Non è stato possibile arrestare l'utente: {e.Message}", banDate, days);
             }
-
-            return (banDate, randomNumber);
         }
-
-        return (null, 0);
     }
 
-    public static async Task<string> SendPenaltyMessage(ITelegramBotClient botClient, CancellationToken cancellationToken, string senderName, string messageText, DbRepo repo, [DisallowNull] int? originalAveManiaId)
+    public static async Task<string> SendPenaltyMessage(ITelegramBotClient botClient, CancellationToken cancellationToken, string senderName, string messageText, DbRepo repo,
+        [DisallowNull] int? originalAveManiaId)
     {
         AveMania? am = repo.Find(originalAveManiaId.Value);
 
@@ -98,7 +68,7 @@ public class MessageHelper
         return text;
     }
 
-    private static async Task RemarkUser(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId,
+    public static async Task RemarkUser(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId,
         string senderName, DateTime? dt)
     {
         string timeMsg = string.Empty;
@@ -120,23 +90,11 @@ public class MessageHelper
         int index = random.Next(AmConstants.Remarks.Count);
         return AmConstants.Remarks[index];
     }
-    
-    public static async Task CheckPenaltyArrest(ITelegramBotClient botClient, CancellationToken cancellationToken,
-        long chatId, long? userId, string senderName, DbRepo repo)
+
+    public static async Task<(bool hasExceeded, int count)> CheckPenaltyArrest(string senderName, DbRepo repo, DateTime messageDateTime)
     {
-        (bool hasExceeded, int count) checkPenalResult = repo.HasAuthorExceededPenalLimit(senderName);
+        (bool hasExceeded, int count) checkPenalResult = repo.HasAuthorExceededPenalLimit(senderName, messageDateTime);
         Console.WriteLine($"Penalties exceeded: {checkPenalResult.hasExceeded} - penalties count {checkPenalResult.count}");
-        if (checkPenalResult.hasExceeded)
-        {
-            (DateTime? banDate, int days) = await BanChatMember(botClient, chatId, userId, cancellationToken);
-            if (banDate.HasValue)
-            {
-                await botClient.SendMessage(
-                    chatId: chatId,
-                    text:
-                    $"{AmConstants.MalePoliceEmoji} ARRESTO per eccesso di multe: {senderName} sarà in prigione per {days} giorni fino al {banDate.Value:g} {AmConstants.MalePoliceEmoji}",
-                    cancellationToken: cancellationToken);
-            }
-        }
+        return checkPenalResult;
     }
 }

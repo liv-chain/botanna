@@ -18,31 +18,87 @@ public class MessageHandler(ITelegramBotClient botClient)
     /// <param name="userId">The unique identifier of the user who sent the message.</param>
     /// <param name="senderName">The name of the user who sent the message. Includes both first name and last name if available.</param>
     /// <param name="messageText">The message text content received from the group or supergroup.</param>
+    /// <param name="messageId"></param>
+    /// <param name="messageDateTime"></param>
     /// <returns>A task representing the asynchronous operation of processing the group message.</returns>
     public async Task HandleGroupMessage(CancellationToken cancellationToken,
-        long chatId, long? userId, string senderName, string messageText)
+        long chatId, long? userId, string senderName, string messageText, int messageId, DateTime messageDateTime)
     {
         Console.WriteLine($"Received message from {chatId} - {senderName}: {messageText}");
-
-        if (Helpers.IsAveMania(messageText))
+        if (!Helpers.IsAveMania(messageText))
         {
-            DbRepo repo = new DbRepo();
-            int? entryId = repo.Check(messageText);
-            if (entryId > 0)
-            {
-                var text = await SendPenaltyMessage(cancellationToken, chatId, senderName, messageText, repo, entryId);
-                repo.Add(new Penalty(text, senderName, 0, DateTime.Now));
-            }
-            else
-            {
-                long unixTimestamp = new DateTimeOffset(DateTime.Now).ToUnixTimeSeconds();
-                repo.Add(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now));
-            }
-
-            if (await CheckActivityArrest(botClient, cancellationToken, chatId, userId, senderName, repo)) return;
-
-            await CheckPenaltyArrest(botClient, cancellationToken, chatId, userId, senderName, repo);
+            return;
         }
+
+        DbRepo repo = new DbRepo();
+        int? entryId = repo.CheckPenalty(messageText);
+        if (entryId > 0)
+        {
+            var text = await SendPenaltyMessage(cancellationToken, chatId, senderName, messageText, repo, entryId);
+            repo.Insert(new Penalty(text, senderName, 0, DateTime.Now));
+        }
+        else
+        {
+            long unixTimestamp = new DateTimeOffset(DateTime.Now).ToUnixTimeSeconds();
+            DbRepo.Insert(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now, messageId));
+        }
+
+        (bool hasExceeded, int count, DateTime? dt) activityCheck = CheckActivityArrest(senderName, repo, messageDateTime);
+
+        Random random = new Random();
+        int randomDays = 0;
+        DateTime banDate = DateTime.Now;
+        Console.WriteLine($"Activity exceeded: {activityCheck.hasExceeded} - activity count {activityCheck.count}");
+        bool activityArrest = false;
+        bool penaltyArrest = false;
+        switch (activityCheck.hasExceeded)
+        {
+            case true when activityCheck.count > AmConstants.ActivityWarningLimit + 1:
+            {
+                randomDays += random.Next(1, 8);
+                banDate = DateTime.Now.AddDays(randomDays);
+                activityArrest = true;
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text:
+                    $"{AmConstants.MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione per {randomDays} giorni fino al {banDate:g} {AmConstants.FemalePoliceEmoji}",
+                    cancellationToken: cancellationToken);
+
+                break;
+            }
+            case true:
+                await RemarkUser(botClient, cancellationToken, chatId, senderName, activityCheck.dt);
+                break;
+        }
+
+        var checkPenalResult = await CheckPenaltyArrest(senderName, repo, messageDateTime);
+
+        if (checkPenalResult.hasExceeded)
+        {
+            randomDays += random.Next(1, 8);
+            banDate = DateTime.Now.AddDays(randomDays);
+            penaltyArrest = true;
+            await botClient.SendMessage(
+                chatId: chatId,
+                text:
+                $"{AmConstants.PoliceCarEmoji} ARRESTO per eccesso di multe: {senderName} sarà in prigione per {randomDays} giorni fino al {banDate:g} {AmConstants.MalePoliceEmoji}",
+                cancellationToken: cancellationToken);
+        }
+
+        if (activityArrest || penaltyArrest)
+        {
+            await BanChatMember(botClient, chatId, userId, cancellationToken, banDate, randomDays);
+        }
+
+        if (activityArrest && penaltyArrest)
+        {
+            await botClient.SendMessage(
+                chatId: chatId,
+                text:
+                $"{AmConstants.MalePoliceEmoji}{AmConstants.FemalePoliceEmoji} MEGA ARRESTO COMBINATO!!! {AmConstants.PoliceCarEmoji}{AmConstants.PoliceCarEmoji}",
+                cancellationToken: cancellationToken);
+        }
+
     }
 
     /// <summary>
@@ -51,9 +107,10 @@ public class MessageHandler(ITelegramBotClient botClient)
     /// <param name="cancellationToken">Propagates notification that operations should be canceled.</param>
     /// <param name="chatId">The unique identifier of the chat where the message originates.</param>
     /// <param name="messageText">The text of the private message received by the bot.</param>
+    /// <param name="messageId"></param>
     /// <returns>A task that represents the asynchronous operation of processing the private message.</returns>
     public async Task HandlePrivateMessage(CancellationToken cancellationToken,
-        long chatId, string messageText)
+        long chatId, string messageText, int? messageId = null)
     {
         try
         {
@@ -80,7 +137,7 @@ public class MessageHandler(ITelegramBotClient botClient)
             if (messageText.ToLower().StartsWith("/add"))
             {
                 messageText = messageText.Replace("/add", "");
-                new DbRepo().Add(new AveMania(messageText.TrimStart(), "Someone", 0, DateTime.Now));
+                DbRepo.Insert(new AveMania(messageText.TrimStart(), "Someone", 0, DateTime.Now, messageId));
                 await botClient.SendMessage(
                     chatId: chatId,
                     text: "Avemania aggiunta!",
@@ -92,7 +149,7 @@ public class MessageHandler(ITelegramBotClient botClient)
             {
                 case "/init":
                 {
-                    new DbRepo().InitDataBase(false);
+                    new DbRepo().EnsureSchemaAndUpdate();
                     await botClient.SendMessage(
                         chatId: chatId,
                         text: "Db inizializzato con successo!",
@@ -101,11 +158,11 @@ public class MessageHandler(ITelegramBotClient botClient)
                 }
                 case "/telepr":
                 {
-                    await new DbRepo().ProcessTelegramMessages(botClient, cancellationToken);
+                    // await new DbRepo().ProcessTelegramMessages(botClient, cancellationToken);
 
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: "Dati ripristinati con successo!",
+                        text: "Metodo commentato diolana",
                         cancellationToken: cancellationToken);
                     break;
                 }
@@ -251,7 +308,7 @@ public class MessageHandler(ITelegramBotClient botClient)
                 string author = string.IsNullOrEmpty(kv.Key) ? "Unknown" : kv.Key;
                 return $"{medal} {author,-20} → {kv.Value}";
             });
-        
+
         var sb = new StringBuilder();
         foreach (var line in ordered)
         {
@@ -262,7 +319,6 @@ public class MessageHandler(ITelegramBotClient botClient)
             chatId: chatId,
             sb.ToString(),
             cancellationToken: cancellationToken);
-        
     }
 
 
@@ -350,7 +406,7 @@ public class MessageHandler(ITelegramBotClient botClient)
         {
             auth = "Utente Facebook";
         }
-        
+
         string text =
             $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {auth} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f";
 
