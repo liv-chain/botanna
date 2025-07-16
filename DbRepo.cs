@@ -1,7 +1,6 @@
 ﻿using System.Data.SQLite;
 using System.Text.Json;
 using AveManiaBot.JsonData.Telegram;
-using Telegram.Bot;
 using static AveManiaBot.AmConstants;
 
 namespace AveManiaBot;
@@ -10,8 +9,7 @@ public class DbRepo
 {
     private const string AmTableName = "ave_mania";
     private const string PenaltyTableName = "penalties";
-    private const int Hours = 12; // Number of hours to check for author exceeding limit
-    private const int PenaltyHoursTimeSpan = 36; // Number of hours to check for author exceeding limit
+    
 
     private const string CreateTableQuery =
         $"CREATE TABLE IF NOT EXISTS {AmTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
@@ -216,7 +214,42 @@ public class DbRepo
         return results;
     }
 
-    public (bool hasExceeded, int count, DateTime?) HasAuthorExceededLimit(string author, int limit, DateTime messageDateTime)
+    /// <summary>
+    /// Returns the DateTimes of the last N messages (including penalties) for a given author, ordered from newest to oldest.
+    /// </summary>
+    private List<DateTime> GetLastNMessageAndPenaltyDates(string author, int n)
+    {
+        var dates = new List<DateTime>();
+        using (var connection = new SQLiteConnection(ConnectionString))
+        {
+            connection.Open();
+            string query = $@"
+                SELECT datetime FROM {AmTableName} WHERE author = @Author
+                UNION ALL
+                SELECT datetime FROM {PenaltyTableName} WHERE author = @Author
+                ORDER BY datetime DESC
+                LIMIT @Limit
+            ";
+            using (var command = new SQLiteCommand(query, connection))
+            {
+                command.Parameters.AddWithValue("@Author", author);
+                command.Parameters.AddWithValue("@Limit", n);
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        if (DateTime.TryParse(reader["datetime"].ToString(), out var dt))
+                        {
+                            dates.Add(dt);
+                        }
+                    }
+                }
+            }
+        }
+        return dates;
+    }
+
+    public (bool hasExceeded, int count, DateTime? date, double timeSpan) HasAuthorExceededLimit(string author, int limit, DateTime messageDateTime)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -234,28 +267,34 @@ public class DbRepo
             using (var command = new SQLiteCommand(query, connection))
             {
                 command.Parameters.AddWithValue("@Author", author);
-                command.Parameters.AddWithValue("@StartDate", messageDateTime.AddHours(-Hours)); 
+                command.Parameters.AddWithValue("@StartDate", messageDateTime.AddHours(-ActivityTimeSpanHours)); 
                 var result = command.ExecuteScalar();
                 if (result != null && int.TryParse(result.ToString(), out int count))
                 {
                     bool exceeded = count > limit;
+                    double? timeSpan = null;
+                    var last5Dates = GetLastNMessageAndPenaltyDates(author, 5);
+                    if (last5Dates.Count >= 5)
+                    {
+                        timeSpan = (last5Dates[0] - last5Dates[4]).TotalHours;
+                    }
                     if (exceeded)
                     {
                         Console.WriteLine($"Author {author} has exceeded the limit of {limit} messages");
-                        DateTime? oldestMessageDateTimeInTimeSpan = GetOldestMessageDateForAuthorInLastHours(author, Hours);
+                        DateTime? oldestMessageDateTimeInTimeSpan = GetOldestMessageDateForAuthorInLastHours(author, ActivityTimeSpanHours);
                         if (oldestMessageDateTimeInTimeSpan != null) Console.WriteLine($"Last message date: {oldestMessageDateTimeInTimeSpan.Value:dd/MM/yyyy HH:mm:ss}");
-                        return (exceeded, count, oldestMessageDateTimeInTimeSpan?.AddHours(Hours));
+                        return (exceeded, count, oldestMessageDateTimeInTimeSpan?.AddHours(ActivityTimeSpanHours), timeSpan ?? 0);
                     }
 
-                    return (exceeded, count, null);
+                    return (exceeded, count, null, timeSpan ?? 0);
                 }
             }
         }
 
-        return (false, 0, null);
+        return (false, 0, null, 0);
     }
 
-    public (bool hasExceeded, int count) HasAuthorExceededPenalLimit(string author, DateTime messageDateTime)
+    public async Task<(bool hasExceeded, int count)> HasAuthorExceededPenalLimit(string author, DateTime messageDateTime)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -268,7 +307,7 @@ public class DbRepo
             {
                 command.Parameters.AddWithValue("@Author", author);
                 command.Parameters.AddWithValue("@StartDate", messageDateTime.AddHours(-PenaltyHoursTimeSpan));
-                var result = command.ExecuteScalar();
+                var result = await command.ExecuteScalarAsync();
                 if (result != null && int.TryParse(result.ToString(), out int count))
                 {
                     bool exceeded = count > PenaltyLimit;
@@ -277,12 +316,10 @@ public class DbRepo
                         Console.WriteLine($"Author {author} has exceeded the limit of 2 penalties in the last {PenaltyHoursTimeSpan} hours");
                         return (exceeded, count);
                     }
-
                     return (exceeded, count);
                 }
             }
         }
-
         return (false, 0);
     }
 

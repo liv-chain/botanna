@@ -43,10 +43,10 @@ public class MessageHandler(ITelegramBotClient botClient)
             DbRepo.Insert(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now, messageId));
         }
 
-        (bool hasExceeded, int count, DateTime? dt) activityCheck = CheckActivityArrest(senderName, repo, messageDateTime);
+        (bool hasExceeded, int count, DateTime? dt, double timeSpan) activityCheck = CheckActivityArrest(senderName, repo, messageDateTime);
 
         Random random = new Random();
-        int randomDays = 0;
+        int days = 0;
         DateTime banDate = DateTime.Now;
         Console.WriteLine($"Activity exceeded: {activityCheck.hasExceeded} - activity count {activityCheck.count}");
         bool activityArrest = false;
@@ -55,13 +55,13 @@ public class MessageHandler(ITelegramBotClient botClient)
         {
             case true when activityCheck.count > AmConstants.ActivityWarningLimit + 1:
             {
-                randomDays += random.Next(1, 8);
-                banDate = DateTime.Now.AddDays(randomDays);
+                days += Math.Min(AmConstants.ActivityTimeSpanHours - (int)Math.Ceiling(activityCheck.timeSpan), 10);
+                banDate = DateTime.Now.AddDays(days);
                 activityArrest = true;
                 await botClient.SendMessage(
                     chatId: chatId,
                     text:
-                    $"{AmConstants.MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione per {randomDays} giorni fino al {banDate:g} {AmConstants.FemalePoliceEmoji}",
+                    $"{AmConstants.MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione per {days} giorni fino al {banDate:g} {AmConstants.FemalePoliceEmoji}",
                     cancellationToken: cancellationToken);
 
                 break;
@@ -75,19 +75,19 @@ public class MessageHandler(ITelegramBotClient botClient)
 
         if (checkPenalResult.hasExceeded)
         {
-            randomDays += random.Next(1, 8);
-            banDate = DateTime.Now.AddDays(randomDays);
+            days += 7;
+            banDate = DateTime.Now.AddDays(days);
             penaltyArrest = true;
             await botClient.SendMessage(
                 chatId: chatId,
                 text:
-                $"{AmConstants.PoliceCarEmoji} ARRESTO per eccesso di multe: {senderName} sarà in prigione per {randomDays} giorni fino al {banDate:g} {AmConstants.MalePoliceEmoji}",
+                $"{AmConstants.PoliceCarEmoji} ARRESTO per eccesso di multe: {senderName} sarà in prigione per {days} giorni fino al {banDate:g} {AmConstants.MalePoliceEmoji}",
                 cancellationToken: cancellationToken);
         }
 
         if (activityArrest || penaltyArrest)
         {
-            await BanChatMember(botClient, chatId, userId, cancellationToken, banDate, randomDays);
+            await BanChatMember(botClient, chatId, userId, cancellationToken, banDate, days);
         }
 
         if (activityArrest && penaltyArrest)

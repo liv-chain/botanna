@@ -89,35 +89,17 @@ class Program
         if (update.EditedMessage != null)
         {
             var chatType = update.EditedMessage.Chat.Type;
+            var chatId= update.EditedMessage.Chat.Id;
+            var userId = update.EditedMessage.From?.Id;
+            var messageDateTime = update.EditedMessage.Date;
+            
             if (chatType != ChatType.Group && chatType != ChatType.Supergroup)
             {
                 return;
             }
-            
+
             Message? edited = update.EditedMessage;
-            var newText = edited.Text ?? "";
-
-            // edit di am già scritte
-            if (Helpers.IsAveMania(newText))
-            {
-                var repo = new DbRepo();
-                var originalText = repo.GetOriginalText(edited.MessageId); 
-                string senderName = $"{edited.From?.FirstName} {edited.From?.LastName}".Trim();
-                
-                await botClient.SendMessage(
-                     chatId: AmConstants.AmChatId,
-                     text: $"{AmConstants.AlertEmoji} {senderName} ha aggiornato {originalText} in {newText}",
-                     cancellationToken: cancellationToken);
-
-                var id = repo.CheckPenalty(newText);
-                var existing = id != null;
-                if (existing)
-                {
-                    await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, senderName, newText, repo, id!);
-                }
-                
-                await repo.Update(edited.MessageId, newText);
-            }
+            await HandleEdit(botClient, cancellationToken, edited, messageDateTime, chatId, userId);
             return;
         }
 
@@ -127,6 +109,60 @@ class Program
             return;
 
         await ProcessMessageBasedOnChatType(botClient, cancellationToken, message, messageText);
+    }
+
+    /// <summary>
+    /// todo_1 spostare nell'helper
+    /// </summary>
+    /// <param name="botClient"></param>
+    /// <param name="cancellationToken"></param>
+    /// <param name="edited"></param>
+    /// <param name="messageDateTime"></param>
+    /// <param name="chatId"></param>
+    /// <param name="userId"></param>
+    private static async Task HandleEdit(ITelegramBotClient botClient, CancellationToken cancellationToken, Message edited, DateTime messageDateTime, long chatId,
+        long? userId)
+    {
+        var newText = edited.Text ?? String.Empty;
+        if (!Helpers.IsAveMania(newText)) return;
+        
+        // edit di am già scritte
+        var repo = new DbRepo();
+        var originalText = repo.GetOriginalText(edited.MessageId);
+        string senderName = $"{edited.From?.FirstName} {edited.From?.LastName}".Trim();
+
+        await botClient.SendMessage(
+            chatId: AmConstants.AmChatId,
+            text: $"{AmConstants.AlertEmoji} {senderName} ha aggiornato {originalText} in {newText}",
+            cancellationToken: cancellationToken);
+
+        var id = repo.CheckPenalty(newText);
+        var existing = id != null;
+        if (existing)
+        {
+            Random random = new Random();
+            int randomDays = 0;
+
+            await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, senderName, newText, repo, id!);
+
+            var checkPenalResult = await MessageHelper.CheckPenaltyArrest(senderName, repo, messageDateTime);
+            if (checkPenalResult.hasExceeded)
+            {
+                randomDays += random.Next(2, 11);
+                DateTime banDate = DateTime.Now.AddDays(randomDays);
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text:
+                    $"{AmConstants.PoliceCarEmoji} ARRESTO per eccesso di multe: {senderName} sarà in prigione per {randomDays} giorni fino al {banDate:g} {AmConstants.MalePoliceEmoji}",
+                    cancellationToken: cancellationToken);
+
+                await MessageHelper.BanChatMember(botClient, chatId, userId, cancellationToken, banDate, randomDays);
+            }
+        }
+
+        await repo.Update(edited.MessageId, newText);
+
+        return;
     }
 
     /// <summary>

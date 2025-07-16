@@ -7,7 +7,7 @@ namespace AveManiaBot;
 
 public class MessageHelper
 {
-    public static (bool hasExceeded, int count, DateTime?) CheckActivityArrest(string senderName, DbRepo repo, DateTime messageDateTime)
+    public static (bool hasExceeded, int count, DateTime? date, double timeSpan) CheckActivityArrest(string senderName, DbRepo repo, DateTime messageDateTime)
     {
         return repo.HasAuthorExceededLimit(senderName, AmConstants.ActivityWarningLimit, messageDateTime);
     }
@@ -58,7 +58,7 @@ public class MessageHelper
         AveMania? am = repo.Find(originalAveManiaId.Value);
 
         string text =
-            $"\ud83d\udc6e\u200d\u2642\ufe0f MULTA \u26a0\ufe0f per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:dd-MM-yyyy} \ud83d\udc6e\u200d\u2640\ufe0f";
+            $"{AmConstants.MalePoliceEmoji} MULTA {AmConstants.AlertEmoji} per {senderName}! {messageText} era già stato scritto da {am?.Author} il {am?.DateTime:d} {AmConstants.FemalePoliceEmoji}";
 
         await botClient.SendMessage(
             chatId: AmConstants.AmChatId,
@@ -74,13 +74,13 @@ public class MessageHelper
         string timeMsg = string.Empty;
         if (dt != null)
         {
-            timeMsg = $" Potrai riprendere a scrivere senza incorrere in arresto alle {dt.Value:t} ";
+            timeMsg = $" Potrai riprendere a scrivere alle {dt.Value:t} ";
         }
 
         await botClient.SendMessage(
             chatId: chatId,
             text:
-            $"{senderName}, {GetRandomRemark()} Al prossimo richiamo di oggi scatterà l'arresto.{timeMsg}{AmConstants.MalePoliceEmoji}",
+            $"{senderName}, {GetRandomRemark()} Al prossimo richiamo finirai in prigione.{timeMsg}{AmConstants.MalePoliceEmoji}",
             cancellationToken: cancellationToken);
     }
 
@@ -93,7 +93,8 @@ public class MessageHelper
 
     public static async Task<(bool hasExceeded, int count)> CheckPenaltyArrest(string senderName, DbRepo repo, DateTime messageDateTime)
     {
-        (bool hasExceeded, int count) checkPenalResult = repo.HasAuthorExceededPenalLimit(senderName, messageDateTime);
+        (bool hasExceeded, int count) checkPenalResult = 
+            await repo.HasAuthorExceededPenalLimit(senderName, messageDateTime);
         Console.WriteLine($"Penalties exceeded: {checkPenalResult.hasExceeded} - penalties count {checkPenalResult.count}");
         return checkPenalResult;
     }
