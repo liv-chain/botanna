@@ -127,11 +127,16 @@ class Program
         var newText = edited.Text ?? String.Empty;
         if (!Helpers.IsAveMania(newText)) return;
         
+        Console.WriteLine($"Message edited by {edited.From?.FirstName} {edited.From?.LastName}: {newText}");
+        
         // edit di am già scritte
         var repo = new DbRepo();
         var originalText = repo.GetOriginalText(edited.MessageId);
         string senderName = $"{edited.From?.FirstName} {edited.From?.LastName}".Trim();
 
+        if (string.IsNullOrEmpty(originalText)) return;
+        if (originalText == newText) return;
+        
         await botClient.SendMessage(
             chatId: AmConstants.AmChatId,
             text: $"{AmConstants.PenEmoji} {senderName} ha aggiornato {originalText} in {newText}",
@@ -226,10 +231,9 @@ class Program
                         $"{e.Days} giorni fino al {e.BanDate:g} {AmConstants.MalePoliceEmoji}",
                         cancellationToken: cancellationToken);
                 }
-
                 break;
             default:
-                await new MessageHandler(botClient).HandlePrivateMessage(cancellationToken, chatId, messageText);
+                await new MessageHandler(botClient).HandlePrivateMessage(cancellationToken, chatId, messageText, senderName);
                 break;
         }
     }

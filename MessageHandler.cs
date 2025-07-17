@@ -105,15 +105,15 @@ public class MessageHandler(ITelegramBotClient botClient)
     /// <param name="cancellationToken">Propagates notification that operations should be canceled.</param>
     /// <param name="chatId">The unique identifier of the chat where the message originates.</param>
     /// <param name="messageText">The text of the private message received by the bot.</param>
+    /// <param name="author"></param>
     /// <param name="messageId"></param>
     /// <returns>A task that represents the asynchronous operation of processing the private message.</returns>
     public async Task HandlePrivateMessage(CancellationToken cancellationToken,
-        long chatId, string messageText, int? messageId = null)
+        long chatId, string messageText, string author, int? messageId = null)
     {
         try
         {
-            
-            Console.WriteLine(messageText);
+            Console.WriteLine($"Received private message from {author}: {messageText}");
             
             // commands with arguments
             if (messageText.ToLower().StartsWith("/s ") || messageText.ToLower().StartsWith("s "))
