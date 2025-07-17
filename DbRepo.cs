@@ -200,7 +200,7 @@ public class DbRepo
             {
                 dateTime = parsedDateTime;
             }
-            int.TryParse(reader["message_id"].ToString(), out var messageId);
+            int.TryParse(reader["messageid"].ToString(), out var messageId);
 
             results.Add(new AveMania(
                 reader["message"].ToString() ?? string.Empty,

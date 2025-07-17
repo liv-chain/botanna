@@ -112,6 +112,9 @@ public class MessageHandler(ITelegramBotClient botClient)
     {
         try
         {
+            
+            Console.WriteLine(messageText);
+            
             // commands with arguments
             if (messageText.ToLower().StartsWith("/s ") || messageText.ToLower().StartsWith("s "))
             {

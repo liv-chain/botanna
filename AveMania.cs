@@ -11,6 +11,6 @@ public record AveMania(string Message, string Author, long TimeStamp, DateTime D
 
     public override string ToString()
     {
-        return $"{MessageId} - {Message} - {Author} - {DateTime:dd-MM-yyyy}";
+        return $"{Message} - {Author} - {DateTime:dd-MM-yyyy}";
     }
 }
