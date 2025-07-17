@@ -2,14 +2,15 @@
 
 public static class AmConstants
 {
-    // public const string BotToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw"; // ufficiale
-    // public const string DbPath = "ave_mania.db";
-    // public const long AmChatId = -1002381222429;
+    public const string BotToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw"; // ufficiale
+    public const string DbPath = "ave_mania.db";
+    public const long AmChatId = -1002381222429;
 
-    public const string BotToken = "7539070202:AAGO7hmQepJ9BIcDRdclkBTsEMpKtzYKnrw"; // test
-    public const string DbPath = "ave_mania__.db"; // test
-    public const long AmChatId = -1002880316353; // test 
+    // public const string BotToken = "7539070202:AAGO7hmQepJ9BIcDRdclkBTsEMpKtzYKnrw"; // test
+    // public const string DbPath = "ave_mania__.db"; // test
+    // public const long AmChatId = -1002880316353; // test 
     public const string AlertEmoji = "\u26A0\uFE0F"; // ⚠️
+    public const string PenEmoji = "\U0001F58A\uFE0F"; // 🖊️
     public const string MalePoliceEmoji = "\U0001F46E\u200D\u2642\U0000FE0F"; // 👮‍♂️
     public const string FemalePoliceEmoji = "\U0001F46E\u200D\u2640\uFE0F"; // 👮‍♀️
     public const string YellowCardEmoji = "\U0001F7E8"; // 🟨
@@ -23,6 +24,36 @@ public static class AmConstants
     public const int ActivityTimeSpanHours = 12; // Number of hours to check for author exceeding limit
     public const int PenaltyHoursTimeSpan = 36; // Number of hours to check for author exceeding limit
 
+    public static class HandEmojis
+    {
+        public const string ThumbsUp = "👍";
+        public const string ThumbsDown = "👎";
+        public const string ClappingHands = "👏";
+        public const string RaisingHands = "🙌";
+        public const string FoldedHands = "🙏";
+        public const string OpenHands = "👐";
+        public const string OkHand = "👌";
+        public const string VictoryHand = "✌️";
+        public const string CallMeHand = "🤙";
+        public const string FlexedBiceps = "💪";
+        public const string WavingHand = "👋";
+        public const string BackhandIndexPointingLeft = "👈";
+        public const string BackhandIndexPointingRight = "👉";
+        public const string BackhandIndexPointingUp = "👆";
+        public const string BackhandIndexPointingDown = "👇";
+        public const string IndexPointingUp = "☝️";
+        public const string RaisedHand = "✋";
+        public const string HandWithFingersSplayed = "🖐️";
+        public const string VulcanSalute = "🖖";
+        public const string WritingHand = "✍️";
+        public const string PinchingHand = "🤏";
+        public const string LoveYouGesture = "🤟";
+        public const string CrossedFingers = "🤞";
+        public const string PalmsUpTogether = "🤲";
+        public const string Handshake = "🤝";
+    }
+
+    
     public static readonly List<string> Remarks =
     [
         YellowCardEmoji,

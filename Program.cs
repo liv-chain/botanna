@@ -103,16 +103,17 @@ class Program
             return;
         }
 
-        //The pattern checks whether is an **object** and whether its property is **not null** or empty. If exists and is valid, the value is extracted into the variable.
-        //`update.Message``Text``Text``messageText`
+        // The pattern checks whether is an **object** and whether its property is **not null** or empty. If exists and is valid, the value is extracted into the variable.
+        // `update.Message``Text``Text``messageText`
         if (update.Message is not { Text: { } messageText } message)
             return;
 
+        // Usual flow
         await ProcessMessageBasedOnChatType(botClient, cancellationToken, message, messageText);
     }
 
     /// <summary>
-    /// todo_1 spostare nell'helper
+    /// 
     /// </summary>
     /// <param name="botClient"></param>
     /// <param name="cancellationToken"></param>
@@ -133,9 +134,31 @@ class Program
 
         await botClient.SendMessage(
             chatId: AmConstants.AmChatId,
-            text: $"{AmConstants.AlertEmoji} {senderName} ha aggiornato {originalText} in {newText}",
+            text: $"{AmConstants.PenEmoji} {senderName} ha aggiornato {originalText} in {newText}",
             cancellationToken: cancellationToken);
 
+        // todo_1 gestione edit e multe
+        // var activityCheck = MessageHelper.CheckActivityArrest(senderName, repo, messageDateTime);
+        //
+        // switch (activityCheck.hasExceeded)
+        // {
+        //     case true when activityCheck.count > AmConstants.ActivityWarningLimit + 1:
+        //     {
+        //         var days = Math.Min(AmConstants.ActivityTimeSpanHours - (int)Math.Ceiling(activityCheck.timeSpan), 10);
+        //         var banDate = DateTime.Now.AddDays(days);
+        //         await botClient.SendMessage(
+        //             chatId: chatId,
+        //             text:
+        //             $"{AmConstants.MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione per {days} giorni fino al {banDate:g} {AmConstants.FemalePoliceEmoji}",
+        //             cancellationToken: cancellationToken);
+        //
+        //         break;
+        //     }
+        //     case true:
+        //         await MessageHelper.RemarkUser(botClient, cancellationToken, chatId, senderName, activityCheck.date);
+        //         break;
+        // }
+        //
         var id = repo.CheckPenalty(newText);
         var existing = id != null;
         if (existing)
@@ -143,8 +166,9 @@ class Program
             Random random = new Random();
             int randomDays = 0;
 
-            await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, senderName, newText, repo, id!);
-
+            var text = await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, senderName, newText, repo, id!);
+            repo.Insert(new Penalty(text, senderName, 0, DateTime.Now));
+            
             var checkPenalResult = await MessageHelper.CheckPenaltyArrest(senderName, repo, messageDateTime);
             if (checkPenalResult.hasExceeded)
             {
@@ -161,8 +185,6 @@ class Program
         }
 
         await repo.Update(edited.MessageId, newText);
-
-        return;
     }
 
     /// <summary>

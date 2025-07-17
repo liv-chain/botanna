@@ -44,8 +44,6 @@ public class MessageHandler(ITelegramBotClient botClient)
         }
 
         (bool hasExceeded, int count, DateTime? dt, double timeSpan) activityCheck = CheckActivityArrest(senderName, repo, messageDateTime);
-
-        Random random = new Random();
         int days = 0;
         DateTime banDate = DateTime.Now;
         Console.WriteLine($"Activity exceeded: {activityCheck.hasExceeded} - activity count {activityCheck.count}");
