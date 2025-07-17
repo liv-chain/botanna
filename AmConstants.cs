@@ -2,13 +2,13 @@
 
 public static class AmConstants
 {
-    public const string BotToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw"; // ufficiale
-    public const string DbPath = "ave_mania.db";
-    public const long AmChatId = -1002381222429;
+    // public const string BotToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw"; // ufficiale
+    // public const string DbPath = "ave_mania.db";
+    // public const long AmChatId = -1002381222429;
 
-    //public const string BotToken = "7539070202:AAGO7hmQepJ9BIcDRdclkBTsEMpKtzYKnrw"; // test
-    //public const string DbPath = "ave_mania__.db"; // test
-//    public const long AmChatId = -1002880316353; // test 
+    public const string BotToken = "7539070202:AAGO7hmQepJ9BIcDRdclkBTsEMpKtzYKnrw"; // test
+    public const string DbPath = "ave_mania__.db"; // test
+    public const long AmChatId = -1002880316353; // test 
     public const string AlertEmoji = "\u26A0\uFE0F"; // ⚠️
     public const string MalePoliceEmoji = "\U0001F46E\u200D\u2642\U0000FE0F"; // 👮‍♂️
     public const string FemalePoliceEmoji = "\U0001F46E\u200D\u2640\uFE0F"; // 👮‍♀️
