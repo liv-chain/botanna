@@ -53,7 +53,8 @@ public class MessageHandler(ITelegramBotClient botClient)
         {
             case true when activityCheck.count > AmConstants.ActivityWarningLimit + 1:
             {
-                days += Math.Min(AmConstants.ActivityTimeSpanHours - (int)Math.Ceiling(activityCheck.timeSpan), 10);
+                Console.WriteLine($"Activity exceeded, time span is {activityCheck.timeSpan:F}");
+                days += Math.Abs(Math.Min(AmConstants.ActivityTimeSpanHours - (int)Math.Ceiling(activityCheck.timeSpan), 10));
                 banDate = DateTime.Now.AddDays(days);
                 activityArrest = true;
                 await botClient.SendMessage(
