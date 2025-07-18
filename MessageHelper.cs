@@ -74,6 +74,7 @@ public class MessageHelper
         string timeMsg = string.Empty;
         if (dt != null)
         {
+            dt = dt.Value.AddMinutes(10);
             timeMsg = $" Potrai riprendere a scrivere alle {dt.Value:t} ";
         }
 
