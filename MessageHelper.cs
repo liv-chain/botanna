@@ -74,7 +74,7 @@ public class MessageHelper
         string timeMsg = string.Empty;
         if (dt != null)
         {
-            dt = dt.Value.AddMinutes(10);
+            dt = dt.Value.AddMinutes(5);
             timeMsg = $" Potrai riprendere a scrivere alle {dt.Value:t} ";
         }
 
@@ -96,7 +96,7 @@ public class MessageHelper
     {
         (bool hasExceeded, int count) checkPenalResult = 
             await repo.HasAuthorExceededPenalLimit(senderName, messageDateTime);
-        Console.WriteLine($"Penalties exceeded: {checkPenalResult.hasExceeded} - penalties count {checkPenalResult.count}");
+        Console.WriteLine($"{DateTime.Now:u} Penalties exceeded: {checkPenalResult.hasExceeded} - penalties count {checkPenalResult.count}");
         return checkPenalResult;
     }
 }

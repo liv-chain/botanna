@@ -1,0 +1,17 @@
+﻿versione 1.4
+gestione avemanine
+classifica multe ultimi 90gg
+
+versione 1.5
+gestione user id 
+richiami botanna su PM
+
+versione 1.6
+salvataggio punteggi am su db
+avemania del mese
+
+
+
+
+
+

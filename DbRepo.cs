@@ -9,7 +9,7 @@ public class DbRepo
 {
     private const string AmTableName = "ave_mania";
     private const string PenaltyTableName = "penalties";
-    
+
 
     private const string CreateTableQuery =
         $"CREATE TABLE IF NOT EXISTS {AmTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
@@ -22,7 +22,7 @@ public class DbRepo
 
     private const string InsertPenaltyCommand =
         $"INSERT INTO {PenaltyTableName} (message, author, datetime) VALUES (@message, @author, @datetime)";
-    
+
     const string UpdateMessageCommand = $"UPDATE {AmTableName} SET message = @message WHERE messageId = @messageId";
 
     private const string SelectQuery = $"SELECT * FROM {AmTableName}";
@@ -88,7 +88,7 @@ public class DbRepo
     //         int? existingMessageId = CheckPenalty(message);
     //         if (existingMessageId.HasValue)
     //         {
-    //             Console.WriteLine($"Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
+    //             Console.WriteLine($"{DateTime.Now:u} Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
     //             if (m is { Text: not null, From: not null })
     //             {
     //                 Insert(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
@@ -102,12 +102,10 @@ public class DbRepo
     //             {
     //                 Insert(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now, m.MessageId));
     //             }
-    //             Console.WriteLine($"Message does not exist in the database. Adding an AveMania message.");
+    //             Console.WriteLine($"{DateTime.Now:u} Message does not exist in the database. Adding an AveMania message.");
     //         }
     //     }
     // }
-
-
     private TelegramChatData? LoadTelegramChatDataFromJsonFiles()
     {
         string jsonContent = File.ReadAllText("jsondata/result.json");
@@ -119,10 +117,10 @@ public class DbRepo
     {
         int i = 0;
         Console.WriteLine("Importing chat data...");
-        Console.WriteLine($"Found {chatData.Count} files to be imported");
+        Console.WriteLine($"{DateTime.Now:u} Found {chatData.Count} files to be imported");
         foreach (ChatData data in chatData)
         {
-            Console.WriteLine($"File {i++} of {chatData.Count} - {data.messages.Count} to be imported");
+            Console.WriteLine($"{DateTime.Now:u} File {i++} of {chatData.Count} - {data.messages.Count} to be imported");
             foreach (var mess in data.messages)
             {
                 if (Helpers.IsAveMania(mess.content))
@@ -134,11 +132,11 @@ public class DbRepo
                     command.Parameters.AddWithValue("@author", aveMania.Author);
                     command.Parameters.AddWithValue("@datetime", DateTime.Now);
                     command.ExecuteNonQuery();
-                    Console.WriteLine($"Message {mess.content} added");
+                    Console.WriteLine($"{DateTime.Now:u} Message {mess.content} added");
                 }
                 else
                 {
-                    Console.WriteLine($"Skipping message {mess.content}");
+                    Console.WriteLine($"{DateTime.Now:u} Skipping message {mess.content}");
                 }
             }
         }
@@ -171,12 +169,12 @@ public class DbRepo
         {
             DateTime.TryParse(reader["datetime"].ToString(), out var dateTime);
             int.TryParse(reader["messageId"].ToString(), out var messageId);
-            
+
             return new AveMania(
                 reader["message"].ToString() ?? string.Empty,
                 reader["author"].ToString() ?? string.Empty,
                 0,
-                dateTime, 
+                dateTime,
                 messageId
             );
         }
@@ -184,7 +182,7 @@ public class DbRepo
         return null;
     }
 
-    public List<AveMania> FindMessagesContaining(string searchText) 
+    public List<AveMania> FindMessagesContaining(string searchText)
     {
         List<AveMania> results = new();
         using var connection = new SQLiteConnection(ConnectionString);
@@ -200,6 +198,7 @@ public class DbRepo
             {
                 dateTime = parsedDateTime;
             }
+
             int.TryParse(reader["messageid"].ToString(), out var messageId);
 
             results.Add(new AveMania(
@@ -246,10 +245,12 @@ public class DbRepo
                 }
             }
         }
+
         return dates;
     }
 
-    public (bool hasExceeded, int count, DateTime? date, double timeSpan) HasAuthorExceededLimit(string author, int limit, DateTime messageDateTime)
+    public (bool hasExceeded, int count, DateTime? date, double timeSpan) HasAuthorExceededLimit(string author,
+        int limit, DateTime messageDateTime)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -267,7 +268,11 @@ public class DbRepo
             using (var command = new SQLiteCommand(query, connection))
             {
                 command.Parameters.AddWithValue("@Author", author);
-                command.Parameters.AddWithValue("@StartDate", messageDateTime.AddHours(-ActivityTimeSpanHours)); 
+                var startDate = messageDateTime.AddHours(-ActivityTimeSpanHours);
+                command.Parameters.AddWithValue("@StartDate", startDate);
+
+                Console.WriteLine($"{DateTime.Now:u} {DateTime.Now} - Looking for AMs from {startDate}");
+
                 var result = command.ExecuteScalar();
                 if (result != null && int.TryParse(result.ToString(), out int count))
                 {
@@ -278,12 +283,17 @@ public class DbRepo
                     {
                         timeSpan = (last5Dates[0] - last5Dates[4]).TotalHours;
                     }
+
                     if (exceeded)
                     {
-                        Console.WriteLine($"Author {author} has exceeded the limit of {limit} messages");
-                        DateTime? oldestMessageDateTimeInTimeSpan = GetOldestMessageDateForAuthorInLastHours(author, ActivityTimeSpanHours);
-                        if (oldestMessageDateTimeInTimeSpan != null) Console.WriteLine($"Last message date: {oldestMessageDateTimeInTimeSpan.Value:dd/MM/yyyy HH:mm:ss}");
-                        return (exceeded, count, oldestMessageDateTimeInTimeSpan?.AddHours(ActivityTimeSpanHours), timeSpan ?? 0);
+                        Console.WriteLine($"{DateTime.Now:u} Author {author} has exceeded the limit of {limit} messages");
+                        DateTime? oldestMessageDateTimeInTimeSpan =
+                            GetOldestMessageDateForAuthorInLastHours(author, ActivityTimeSpanHours, messageDateTime);
+                        if (oldestMessageDateTimeInTimeSpan != null)
+                            Console.WriteLine(
+                                $"Last message date: {oldestMessageDateTimeInTimeSpan.Value:dd/MM/yyyy HH:mm:ss}");
+                        return (exceeded, count, oldestMessageDateTimeInTimeSpan?.AddHours(ActivityTimeSpanHours),
+                            timeSpan ?? 0);
                     }
 
                     return (exceeded, count, null, timeSpan ?? 0);
@@ -294,7 +304,8 @@ public class DbRepo
         return (false, 0, null, 0);
     }
 
-    public async Task<(bool hasExceeded, int count)> HasAuthorExceededPenalLimit(string author, DateTime messageDateTime)
+    public async Task<(bool hasExceeded, int count)> HasAuthorExceededPenalLimit(string author,
+        DateTime messageDateTime)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -313,18 +324,21 @@ public class DbRepo
                     bool exceeded = count > PenaltyLimit;
                     if (exceeded)
                     {
-                        Console.WriteLine($"Author {author} has exceeded the limit of 2 penalties in the last {PenaltyHoursTimeSpan} hours");
+                        Console.WriteLine(
+                            $"Author {author} has exceeded the limit of 2 penalties in the last {PenaltyHoursTimeSpan} hours");
                         return (exceeded, count);
                     }
+
                     return (exceeded, count);
                 }
             }
         }
+
         return (false, 0);
     }
 
 
-    public DateTime? GetOldestMessageDateForAuthorInLastHours(string author, int hours)
+    private DateTime? GetOldestMessageDateForAuthorInLastHours(string author, int hours, DateTime messageDateTime)
     {
         using (var connection = new SQLiteConnection(ConnectionString))
         {
@@ -338,7 +352,7 @@ public class DbRepo
             using (var command = new SQLiteCommand(query, connection))
             {
                 command.Parameters.AddWithValue("@Author", author);
-                command.Parameters.AddWithValue("@StartDate", DateTime.Now.AddHours(-hours));
+                command.Parameters.AddWithValue("@StartDate", messageDateTime.AddHours(-hours));
                 var result = command.ExecuteScalar();
                 if (result != DBNull.Value && result != null)
                 {
@@ -389,7 +403,7 @@ public class DbRepo
             catch (Exception ex)
             {
                 // Handle other exceptions
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                Console.WriteLine($"{DateTime.Now:u} An error occurred: {ex.Message}");
             }
         }
 
@@ -483,7 +497,7 @@ public class DbRepo
                     while (reader.Read())
                     {
                         DateTime.TryParse(reader["datetime"].ToString(), out var dateTime);
-                        
+
                         int.TryParse(reader["messageId"].ToString(), out var messageId);
                         randomAveManias.Add(new AveMania(
                             reader["message"].ToString() ?? string.Empty,
@@ -609,7 +623,7 @@ public class DbRepo
 
         Console.WriteLine("SQL command executed successfully.");
     }
-    
+
     public async Task<Dictionary<string, int>> GetAveManiaCountPerAuthor()
     {
         Dictionary<string, int> authorCounts = new();
@@ -744,11 +758,11 @@ public class DbRepo
         string query = $"SELECT message FROM {AmTableName} WHERE messageId = @messageId";
         using var command = new SQLiteCommand(query, connection);
         command.Parameters.AddWithValue("@messageId", messageId);
-        
+
         var am = command.ExecuteScalar();
         return am?.ToString() ?? string.Empty;
     }
-    
+
     public void EnsureSchemaAndUpdate()
     {
         using (var connection = new SQLiteConnection(ConnectionString))
@@ -805,5 +819,4 @@ public class DbRepo
             }
         }
     }
-
 }

@@ -11,10 +11,14 @@ using Message = Telegram.Bot.Types.Message;
 class Program
 {
     private static TelegramBotClient? _botClient;
+    private static Timer? _backgroundTimer;
 
     static async Task Main(string[] args)
     {
         await RunBot();
+        // InitializeBackgroundTimer();
+
+
         Console.ReadLine();
     }
 
@@ -48,7 +52,7 @@ class Program
         {
             var me = await _botClient.GetMe(cancellationToken: cts.Token);
             string assemblyVersion = typeof(Program).Assembly.GetName().Version?.ToString() ?? "Version not available";
-            Console.WriteLine($"Bot {me.Username} version {assemblyVersion} is up and running!");
+            Console.WriteLine($"{DateTime.Now:u} Bot {me.Username} version {assemblyVersion} is up and running!");
         }
         catch (Exception)
         {
@@ -62,11 +66,11 @@ class Program
             try
             {
                 var me = await retryPolicy.ExecuteAsync(() => _botClient.GetMe(cancellationToken: cts.Token));
-                Console.WriteLine($"Bot {me.Username} is up and running!");
+                Console.WriteLine($"{DateTime.Now:u} Bot {me.Username} is up and running!");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to retrieve bot information: {ex.Message}");
+                Console.WriteLine($"{DateTime.Now:u} Failed to retrieve bot information: {ex.Message}");
             }
         }
 
@@ -89,10 +93,10 @@ class Program
         if (update.EditedMessage != null)
         {
             var chatType = update.EditedMessage.Chat.Type;
-            var chatId= update.EditedMessage.Chat.Id;
+            var chatId = update.EditedMessage.Chat.Id;
             var userId = update.EditedMessage.From?.Id;
-            var messageDateTime = update.EditedMessage.Date;
-            
+            var messageDateTime = update.EditedMessage.Date.ToLocalTime();
+
             if (chatType != ChatType.Group && chatType != ChatType.Supergroup)
             {
                 return;
@@ -102,9 +106,27 @@ class Program
             await HandleEdit(botClient, cancellationToken, edited, messageDateTime, chatId, userId);
             return;
         }
-
+        
         // The pattern checks whether is an **object** and whether its property is **not null** or empty. If exists and is valid, the value is extracted into the variable.
         // `update.Message``Text``Text``messageText`
+        if (update.MessageReaction != null)
+        {
+            try
+            {
+                var chatType = update.MessageReaction.Chat.Type;
+                if (chatType != ChatType.Group && chatType != ChatType.Supergroup)
+                {
+                    return;
+                }
+                Console.WriteLine($"{DateTime.Now:u} Reaction from {update.MessageReaction.User?.FirstName}: " +
+                                  $"{string.Join(", ", update.MessageReaction.NewReaction.Select<ReactionType, object>(r => r.Type == ReactionTypeKind.Emoji))}");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+        }
+
         if (update.Message is not { Text: { } messageText } message)
             return;
 
@@ -126,9 +148,9 @@ class Program
     {
         var newText = edited.Text ?? String.Empty;
         if (!Helpers.IsAveMania(newText)) return;
-        
-        Console.WriteLine($"Message edited by {edited.From?.FirstName} {edited.From?.LastName}: {newText}");
-        
+
+        Console.WriteLine($"{DateTime.Now:u} Message edited by {edited.From?.FirstName} {edited.From?.LastName}: {newText}");
+
         // edit di am già scritte
         var repo = new DbRepo();
         var originalText = repo.GetOriginalText(edited.MessageId);
@@ -136,7 +158,7 @@ class Program
 
         if (string.IsNullOrEmpty(originalText)) return;
         if (originalText == newText) return;
-        
+
         await botClient.SendMessage(
             chatId: AmConstants.AmChatId,
             text: $"{AmConstants.PenEmoji} {senderName} ha aggiornato {originalText} in {newText}",
@@ -145,7 +167,7 @@ class Program
         // todo_1 gestione edit e multe
         // var activityCheck = MessageHelper.CheckActivityArrest(senderName, repo, messageDateTime);
         //
-        // switch (activityCheck.hasExceeded)
+        // switch (activityCheck.hasExceeded)33
         // {
         //     case true when activityCheck.count > AmConstants.ActivityWarningLimit + 1:
         //     {
@@ -173,7 +195,7 @@ class Program
 
             var text = await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, senderName, newText, repo, id!);
             repo.Insert(new Penalty(text, senderName, 0, DateTime.Now));
-            
+
             var checkPenalResult = await MessageHelper.CheckPenaltyArrest(senderName, repo, messageDateTime);
             if (checkPenalResult.hasExceeded)
             {
@@ -209,7 +231,7 @@ class Program
         var userId = message.From?.Id!;
         string senderName = message.From?.FirstName!;
         var messageId = message.MessageId;
-        var messageDateTime = message.Date;
+        var messageDateTime = message.Date.ToLocalTime();
 
         if (!string.IsNullOrEmpty(message.From?.LastName))
             senderName += $" {message.From?.LastName}";
@@ -231,6 +253,7 @@ class Program
                         $"{e.Days} giorni fino al {e.BanDate:g} {AmConstants.MalePoliceEmoji}",
                         cancellationToken: cancellationToken);
                 }
+
                 break;
             default:
                 await new MessageHandler(botClient).HandlePrivateMessage(cancellationToken, chatId, messageText, senderName);
@@ -241,7 +264,18 @@ class Program
     private static Task HandleError(ITelegramBotClient botClient, Exception exception,
         CancellationToken cancellationToken)
     {
-        Console.WriteLine($"Error: {exception.Message}");
+        Console.WriteLine($"{DateTime.Now:u} Error: {exception.Message}");
         return Task.CompletedTask;
+    }
+
+    private static void InitializeBackgroundTimer()
+    {
+        _backgroundTimer = new Timer(RunBackgroundTask, null, TimeSpan.Zero, TimeSpan.FromMinutes(10));
+    }
+
+    private static void RunBackgroundTask(object? state)
+    {
+        Console.WriteLine($"{DateTime.Now:u} Background task executed at: {DateTime.Now}");
+        // Add your background task logic here
     }
 }

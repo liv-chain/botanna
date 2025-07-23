@@ -24,7 +24,7 @@ public class MessageHandler(ITelegramBotClient botClient)
     public async Task HandleGroupMessage(CancellationToken cancellationToken,
         long chatId, long? userId, string senderName, string messageText, int messageId, DateTime messageDateTime)
     {
-        Console.WriteLine($"Received message from {chatId} - {senderName}: {messageText}");
+        Console.WriteLine($"{DateTime.Now:u} Received message from {chatId} - {senderName}: {messageText}");
         if (!Helpers.IsAveMania(messageText))
         {
             return;
@@ -46,14 +46,14 @@ public class MessageHandler(ITelegramBotClient botClient)
         (bool hasExceeded, int count, DateTime? dt, double timeSpan) activityCheck = CheckActivityArrest(senderName, repo, messageDateTime);
         int days = 0;
         DateTime banDate = DateTime.Now;
-        Console.WriteLine($"Activity exceeded: {activityCheck.hasExceeded} - activity count {activityCheck.count}");
+        Console.WriteLine($"{DateTime.Now:u} Activity exceeded: {activityCheck.hasExceeded} - activity count {activityCheck.count}");
         bool activityArrest = false;
         bool penaltyArrest = false;
         switch (activityCheck.hasExceeded)
         {
             case true when activityCheck.count > AmConstants.ActivityWarningLimit + 1:
             {
-                Console.WriteLine($"Activity exceeded, time span is {activityCheck.timeSpan:F}");
+                Console.WriteLine($"{DateTime.Now:u} Activity exceeded, time span is {activityCheck.timeSpan:F}");
                 days += Math.Abs(Math.Min(AmConstants.ActivityTimeSpanHours - (int)Math.Ceiling(activityCheck.timeSpan), 10));
                 banDate = DateTime.Now.AddDays(days);
                 activityArrest = true;
@@ -114,7 +114,7 @@ public class MessageHandler(ITelegramBotClient botClient)
     {
         try
         {
-            Console.WriteLine($"Received private message from {author}: {messageText}");
+            Console.WriteLine($"{DateTime.Now:u} Received private message from {author}: {messageText}");
             
             // commands with arguments
             if (messageText.ToLower().StartsWith("/s ") || messageText.ToLower().StartsWith("s "))
