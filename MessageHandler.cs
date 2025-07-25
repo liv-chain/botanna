@@ -53,8 +53,8 @@ public class MessageHandler(ITelegramBotClient botClient)
         {
             case true when activityCheck.count > AmConstants.ActivityWarningLimit + 1:
             {
-                Console.WriteLine($"{DateTime.Now:u} Activity exceeded, time span is {activityCheck.timeSpan:F}");
-                days += Math.Abs(Math.Min(AmConstants.ActivityTimeSpanHours - (int)Math.Ceiling(activityCheck.timeSpan), 10));
+                Console.WriteLine($"{DateTime.Now:u} Activity exceeded: time span is {activityCheck.timeSpan:F}");
+                days += Math.Abs(Math.Min(AmConstants.ActivityTimeSpanHours - (int)Math.Floor(activityCheck.timeSpan), 10));
                 banDate = DateTime.Now.AddDays(days);
                 activityArrest = true;
                 await botClient.SendMessage(
@@ -74,7 +74,7 @@ public class MessageHandler(ITelegramBotClient botClient)
 
         if (checkPenalResult.hasExceeded)
         {
-            days += 7;
+            days += 5;
             banDate = DateTime.Now.AddDays(days);
             penaltyArrest = true;
             await botClient.SendMessage(
@@ -114,8 +114,6 @@ public class MessageHandler(ITelegramBotClient botClient)
     {
         try
         {
-            Console.WriteLine($"{DateTime.Now:u} Received private message from {author}: {messageText}");
-            
             // commands with arguments
             if (messageText.ToLower().StartsWith("/s ") || messageText.ToLower().StartsWith("s "))
             {

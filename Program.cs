@@ -90,6 +90,8 @@ class Program
     private static async Task HandleUpdate(ITelegramBotClient botClient, Update update,
         CancellationToken cancellationToken)
     {
+        Console.WriteLine($"{DateTime.Now:u} Update type: " + update.Type);
+        
         if (update.EditedMessage != null)
         {
             var chatType = update.EditedMessage.Chat.Type;
@@ -107,26 +109,6 @@ class Program
             return;
         }
         
-        // The pattern checks whether is an **object** and whether its property is **not null** or empty. If exists and is valid, the value is extracted into the variable.
-        // `update.Message``Text``Text``messageText`
-        if (update.MessageReaction != null)
-        {
-            try
-            {
-                var chatType = update.MessageReaction.Chat.Type;
-                if (chatType != ChatType.Group && chatType != ChatType.Supergroup)
-                {
-                    return;
-                }
-                Console.WriteLine($"{DateTime.Now:u} Reaction from {update.MessageReaction.User?.FirstName}: " +
-                                  $"{string.Join(", ", update.MessageReaction.NewReaction.Select<ReactionType, object>(r => r.Type == ReactionTypeKind.Emoji))}");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
-        }
-
         if (update.Message is not { Text: { } messageText } message)
             return;
 

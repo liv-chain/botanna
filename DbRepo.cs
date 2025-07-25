@@ -287,13 +287,8 @@ public class DbRepo
                     if (exceeded)
                     {
                         Console.WriteLine($"{DateTime.Now:u} Author {author} has exceeded the limit of {limit} messages");
-                        DateTime? oldestMessageDateTimeInTimeSpan =
-                            GetOldestMessageDateForAuthorInLastHours(author, ActivityTimeSpanHours, messageDateTime);
-                        if (oldestMessageDateTimeInTimeSpan != null)
-                            Console.WriteLine(
-                                $"Last message date: {oldestMessageDateTimeInTimeSpan.Value:dd/MM/yyyy HH:mm:ss}");
-                        return (exceeded, count, oldestMessageDateTimeInTimeSpan?.AddHours(ActivityTimeSpanHours),
-                            timeSpan ?? 0);
+                        DateTime? oldestMessageDateTimeInTimeSpan = GetOldestMessageDateForAuthorInLastHours(author, ActivityTimeSpanHours, messageDateTime);
+                        return (exceeded, count, oldestMessageDateTimeInTimeSpan?.AddHours(ActivityTimeSpanHours), timeSpan ?? 0);
                     }
 
                     return (exceeded, count, null, timeSpan ?? 0);
