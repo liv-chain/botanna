@@ -81,7 +81,7 @@ public class MessageHelper
         await botClient.SendMessage(
             chatId: chatId,
             text:
-            $"{senderName}, {GetRandomRemark()}. Al prossimo richiamo finirai in prigione.{timeMsg}{AmConstants.MalePoliceEmoji}",
+            $"{senderName}, {GetRandomRemark()}. {timeMsg}{AmConstants.MalePoliceEmoji}",
             cancellationToken: cancellationToken);
     }
 

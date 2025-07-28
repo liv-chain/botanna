@@ -11,22 +11,11 @@ using Message = Telegram.Bot.Types.Message;
 class Program
 {
     private static TelegramBotClient? _botClient;
-    private static Timer? _backgroundTimer;
 
-    static async Task Main(string[] args)
+    static async Task Main(string[] _)
     {
         await RunBot();
-        // InitializeBackgroundTimer();
-
-
         Console.ReadLine();
-    }
-
-    private static async Task RestartBot()
-    {
-        Console.WriteLine("Restarting bot...");
-        if (_botClient != null) await _botClient.Close();
-        await RunBot();
     }
 
     private static async Task RunBot()
@@ -58,7 +47,7 @@ class Program
         {
             var retryPolicy = Policy.Handle<Exception>()
                 .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    (exception, timeSpan, retryCount, context) =>
+                    (exception, timeSpan, retryCount, _) =>
                     {
                         Console.WriteLine(
                             $"Retry {retryCount} for GetMe due to: {exception.Message}. Waiting {timeSpan.TotalSeconds} seconds before retrying...");
@@ -85,7 +74,7 @@ class Program
     /// </summary>
     /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
     /// <param name="update">The update object containing the details of the changes or actions that occurred, such as new or edited messages.</param>
-    /// <param name="cancellationToken">Token used to propagate notification that the operation should be cancelled.</param>
+    /// <param name="cancellationToken">Token used to propagate notification that the operation should be canceled.</param>
     /// <returns>A task representing the asynchronous operation for processing the incoming update.</returns>
     private static async Task HandleUpdate(ITelegramBotClient botClient, Update update,
         CancellationToken cancellationToken)
@@ -146,10 +135,10 @@ class Program
             text: $"{AmConstants.PenEmoji} {senderName} ha aggiornato {originalText} in {newText}",
             cancellationToken: cancellationToken);
 
-        // todo_1 gestione edit e multe
+        // todo_1 gestione edit e arresti
         // var activityCheck = MessageHelper.CheckActivityArrest(senderName, repo, messageDateTime);
         //
-        // switch (activityCheck.hasExceeded)33
+        // switch (activityCheck.hasExceeded)
         // {
         //     case true when activityCheck.count > AmConstants.ActivityWarningLimit + 1:
         //     {
@@ -249,15 +238,5 @@ class Program
         Console.WriteLine($"{DateTime.Now:u} Error: {exception.Message}");
         return Task.CompletedTask;
     }
-
-    private static void InitializeBackgroundTimer()
-    {
-        _backgroundTimer = new Timer(RunBackgroundTask, null, TimeSpan.Zero, TimeSpan.FromMinutes(10));
-    }
-
-    private static void RunBackgroundTask(object? state)
-    {
-        Console.WriteLine($"{DateTime.Now:u} Background task executed at: {DateTime.Now}");
-        // Add your background task logic here
-    }
+    
 }
