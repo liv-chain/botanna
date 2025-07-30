@@ -316,11 +316,11 @@ public class DbRepo
                 var result = await command.ExecuteScalarAsync();
                 if (result != null && int.TryParse(result.ToString(), out int count))
                 {
-                    bool exceeded = count > PenaltyLimit;
+                    bool exceeded = count >= PenaltyLimit;
                     if (exceeded)
                     {
                         Console.WriteLine(
-                            $"Author {author} has exceeded the limit of 2 penalties in the last {PenaltyHoursTimeSpan} hours");
+                            $"Author {author} has exceeded the limit of {PenaltyLimit} penalties in the last {PenaltyHoursTimeSpan} hours");
                         return (exceeded, count);
                     }
 

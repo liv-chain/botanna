@@ -50,4 +50,10 @@
       <Folder Include="JsonData\photos\" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Update="Program.cs">
+        <DependentUpon>Dockerfile</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
 </Project>

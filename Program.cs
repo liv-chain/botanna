@@ -16,6 +16,11 @@ class Program
     {
         await RunBot();
         Console.ReadLine();
+        while (true)
+        {
+            Thread.Sleep(1000);
+        }
+
     }
 
     private static async Task RunBot()

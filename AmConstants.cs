@@ -6,9 +6,9 @@ public static class AmConstants
     public const string DbPath = "ave_mania.db";
     public const long AmChatId = -1002381222429;
 
-    // public const string BotToken = "7539070202:AAGO7hmQepJ9BIcDRdclkBTsEMpKtzYKnrw"; // test
-    // public const string DbPath = "ave_mania__.db"; // test
-    // public const long AmChatId = -1002880316353; // test 
+    //public const string BotToken = "7539070202:AAGO7hmQepJ9BIcDRdclkBTsEMpKtzYKnrw"; // test
+    //public const string DbPath = "ave_mania__.db"; // test
+    //public const long AmChatId = -1002880316353; // test 
     
     public const string AlertEmoji = "\u26A0\uFE0F"; // ⚠️
     public const string PenEmoji = "\U0001F58A\uFE0F"; // 🖊️
@@ -22,7 +22,7 @@ public static class AmConstants
 
     public const int PenaltyLimit = 3;
     public const int ActivityTimeSpanHours = 12; // Number of hours to check for author exceeding limit
-    public const int PenaltyHoursTimeSpan = 36; // Number of hours to check for author exceeding limit
+    public const int PenaltyHoursTimeSpan = 48; // Number of hours to check for author exceeding limit
 
     public static class HandEmojis
     {
