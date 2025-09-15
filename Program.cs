@@ -139,29 +139,7 @@ class Program
             chatId: AmConstants.AmChatId,
             text: $"{AmConstants.PenEmoji} {senderName} ha aggiornato {originalText} in {newText}",
             cancellationToken: cancellationToken);
-
-        // todo_1 gestione edit e arresti
-        // var activityCheck = MessageHelper.CheckActivityArrest(senderName, repo, messageDateTime);
-        //
-        // switch (activityCheck.hasExceeded)
-        // {
-        //     case true when activityCheck.count > AmConstants.ActivityWarningLimit + 1:
-        //     {
-        //         var days = Math.Min(AmConstants.ActivityTimeSpanHours - (int)Math.Ceiling(activityCheck.timeSpan), 10);
-        //         var banDate = DateTime.Now.AddDays(days);
-        //         await botClient.SendMessage(
-        //             chatId: chatId,
-        //             text:
-        //             $"{AmConstants.MalePoliceEmoji} ARRESTO: {senderName} sarà in prigione per {days} giorni fino al {banDate:g} {AmConstants.FemalePoliceEmoji}",
-        //             cancellationToken: cancellationToken);
-        //
-        //         break;
-        //     }
-        //     case true:
-        //         await MessageHelper.RemarkUser(botClient, cancellationToken, chatId, senderName, activityCheck.date);
-        //         break;
-        // }
-        //
+        
         var id = repo.CheckPenalty(newText);
         var existing = id != null;
         if (existing)
@@ -170,7 +148,7 @@ class Program
             int randomDays = 0;
 
             var text = await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, senderName, newText, repo, id!);
-            repo.Insert(new Penalty(text, senderName, 0, DateTime.Now));
+            repo.Insert(new Penalty(text, senderName, 0, edited.Date));
 
             var checkPenalResult = await MessageHelper.CheckPenaltyArrest(senderName, repo, messageDateTime);
             if (checkPenalResult.hasExceeded)

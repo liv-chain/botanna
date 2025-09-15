@@ -35,12 +35,12 @@ public class MessageHandler(ITelegramBotClient botClient)
         if (entryId > 0)
         {
             var text = await SendPenaltyMessage(cancellationToken, chatId, senderName, messageText, repo, entryId);
-            repo.Insert(new Penalty(text, senderName, 0, DateTime.Now));
+            repo.Insert(new Penalty(text, senderName, 0, messageDateTime));
         }
         else
         {
-            long unixTimestamp = new DateTimeOffset(DateTime.Now).ToUnixTimeSeconds();
-            DbRepo.Insert(new AveMania(messageText, senderName, unixTimestamp, DateTime.Now, messageId));
+            long unixTimestamp = new DateTimeOffset(messageDateTime).ToUnixTimeSeconds();
+            DbRepo.Insert(new AveMania(messageText, senderName, unixTimestamp, messageDateTime, messageId));
         }
 
         (bool hasExceeded, int count, DateTime? dt, double timeSpan) activityCheck = CheckActivityArrest(senderName, repo, messageDateTime);
@@ -158,11 +158,11 @@ public class MessageHandler(ITelegramBotClient botClient)
                 }
                 case "/telepr":
                 {
-                    // await new DbRepo().ProcessTelegramMessages(botClient, cancellationToken);
+                    await new DbRepo().ProcessTelegramMessages(botClient, cancellationToken);
 
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: "Metodo commentato diolana",
+                        text: "Fatto",
                         cancellationToken: cancellationToken);
                     break;
                 }

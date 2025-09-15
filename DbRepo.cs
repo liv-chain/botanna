@@ -1,6 +1,7 @@
 ﻿using System.Data.SQLite;
 using System.Text.Json;
 using AveManiaBot.JsonData.Telegram;
+using Telegram.Bot;
 using static AveManiaBot.AmConstants;
 
 namespace AveManiaBot;
@@ -63,49 +64,49 @@ public class DbRepo
     /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests during the asynchronous operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    // public async Task ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken)
-    // {
-    //     Console.WriteLine("Importing data from unprocessed telegram messages...");
-    //     var chatData = LoadTelegramChatDataFromJsonFiles();
-    //     if (chatData != null) await ImportChatData(chatData.Messages, botClient, cancellationToken);
-    // }
+    public async Task ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken)
+    {
+         Console.WriteLine("Importing data from unprocessed telegram messages...");
+         var chatData = LoadTelegramChatDataFromJsonFiles();
+         if (chatData != null) await ImportChatData(chatData.Messages, botClient, cancellationToken);
+    }
 
-    // private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, 
-    //     CancellationToken cancellationToken)
-    // {
-    //     var lastMessageDateTime = GetLastMessageDateTime();
-    //     long unixTime = ((DateTimeOffset)lastMessageDateTime!).ToUnixTimeSeconds();
-    //
-    //     var messages = chatDataMessages.Where(m => long.Parse(m.DateUnixtime) > unixTime);
-    //     foreach (AveManiaBot.JsonData.Telegram.Message m in messages)
-    //     {
-    //         // verifica se è già nel db
-    //         string message = m.Text!;
-    //
-    //         bool isAm = Helpers.IsAveMania(message);
-    //         if (!isAm) continue;
-    //
-    //         int? existingMessageId = CheckPenalty(message);
-    //         if (existingMessageId.HasValue)
-    //         {
-    //             Console.WriteLine($"{DateTime.Now:u} Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
-    //             if (m is { Text: not null, From: not null })
-    //             {
-    //                 Insert(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
-    //                 await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
-    //             }
-    //         }
-    //         else
-    //         {
-    //             // se non esiste inserisci una ave mania
-    //             if (m.From != null)
-    //             {
-    //                 Insert(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now, m.MessageId));
-    //             }
-    //             Console.WriteLine($"{DateTime.Now:u} Message does not exist in the database. Adding an AveMania message.");
-    //         }
-    //     }
-    // }
+    private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, 
+        CancellationToken cancellationToken)
+    {
+        DateTime? lastMessageDateTime = GetLastMessageDateTime();
+        long unixTime = ((DateTimeOffset)lastMessageDateTime!).ToUnixTimeSeconds();
+    
+        var messages = chatDataMessages.Where(m => long.Parse(m.DateUnixtime) > unixTime);
+        foreach (AveManiaBot.JsonData.Telegram.Message m in messages)
+        {
+            // verifica se è già nel db
+            string message = m.Text!;
+    
+            bool isAm = Helpers.IsAveMania(message);
+            if (!isAm) continue;
+    
+            int? existingMessageId = CheckPenalty(message);
+            if (existingMessageId.HasValue)
+            {
+                Console.WriteLine($"{DateTime.Now:u} Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
+                if (m is { Text: not null, From: not null })
+                {
+                    Insert(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
+                    await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
+                }
+            }
+            else
+            {
+                // se non esiste inserisci una ave mania
+                if (m.From != null)
+                {
+                    Insert(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now, m.MessageId));
+                }
+                Console.WriteLine($"{DateTime.Now:u} Message does not exist in the database. Adding an AveMania message.");
+            }
+        }
+    }
     private TelegramChatData? LoadTelegramChatDataFromJsonFiles()
     {
         string jsonContent = File.ReadAllText("jsondata/result.json");
@@ -126,11 +127,11 @@ public class DbRepo
                 if (Helpers.IsAveMania(mess.content))
                 {
                     AveMania aveMania = new(mess.content, mess.sender_name, mess.timestamp_ms,
-                        DateTime.Now, mess.message_id);
+                        DateTime.Today, mess.message_id);
                     using var command = new SQLiteCommand(InsertCommand, connection);
                     command.Parameters.AddWithValue("@message", aveMania.Message);
                     command.Parameters.AddWithValue("@author", aveMania.Author);
-                    command.Parameters.AddWithValue("@datetime", DateTime.Now);
+                    command.Parameters.AddWithValue("@datetime", DateTimeOffset.FromUnixTimeMilliseconds(aveMania.TimeStamp).DateTime);
                     command.ExecuteNonQuery();
                     Console.WriteLine($"{DateTime.Now:u} Message {mess.content} added");
                 }
@@ -271,7 +272,7 @@ public class DbRepo
                 var startDate = messageDateTime.AddHours(-ActivityTimeSpanHours);
                 command.Parameters.AddWithValue("@StartDate", startDate);
 
-                Console.WriteLine($"{DateTime.Now:u} {DateTime.Now} - Looking for AMs from {startDate}");
+                Console.WriteLine($"{DateTime.Now:u} - Looking for AMs from {startDate}");
 
                 var result = command.ExecuteScalar();
                 if (result != null && int.TryParse(result.ToString(), out int count))
