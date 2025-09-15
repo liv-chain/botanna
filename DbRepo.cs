@@ -322,7 +322,6 @@ public class DbRepo
                     {
                         Console.WriteLine(
                             $"Author {author} has exceeded the limit of {PenaltyLimit} penalties in the last {PenaltyHoursTimeSpan} hours");
-                        return (exceeded, count);
                     }
 
                     return (exceeded, count);
@@ -690,7 +689,7 @@ public class DbRepo
                         }
                         else
                         {
-                            double ratio = aveManiaCount > 0 ? penaltyCount / (double)aveManiaCount : 0;
+                            double ratio = penaltyCount / (double)aveManiaCount;
                             authorRatios[author] = ratio;
                         }
                     }
