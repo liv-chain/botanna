@@ -2,13 +2,13 @@
 
 public static class AmConstants
 {
-    public const string BotToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw"; // ufficiale
-    public const string DbPath = "ave_mania.db";
-    public const long AmChatId = -1002381222429;
+    //public const string BotToken = "7997826290:AAGdFuQNlwjynaheYTV6wq7kBlYr5WBWNQw"; // ufficiale
+    //public const string DbPath = "ave_mania.db";
+    //public const long AmChatId = -1002381222429;
 
-    //public const string BotToken = "7539070202:AAGO7hmQepJ9BIcDRdclkBTsEMpKtzYKnrw"; // test
-    //public const string DbPath = "ave_mania__.db"; // test
-    //public const long AmChatId = -1002880316353; // test 
+    public const string BotToken = "7539070202:AAGO7hmQepJ9BIcDRdclkBTsEMpKtzYKnrw"; // test
+    public const string DbPath = "ave_mania.db"; // test
+    public const long AmChatId = -1002880316353; // test 
     
     public const string AlertEmoji = "\u26A0\uFE0F"; // ⚠️
     public const string PenEmoji = "\U0001F58A\uFE0F"; // 🖊️
@@ -64,6 +64,7 @@ public static class AmConstants
         "parli come se stessi cercando di perdere amici a tempo record",
         "ti hanno detto che il silenzio è d’oro? Tu sei in debito",
         "c'è più senso in un rutto che in quello che dici",
+        "ti puzza il culo",
         "hai un talento raro: riesci a parlare tanto dicendo PATATE",
         "stai trasformando l’aria in peti, complimenti",
         "hai finito di scaccolarti con la lingua o vai avanti?",
@@ -109,21 +110,11 @@ public static class AmConstants
         "va bene, ho capito. Possiamo chiudere il discorso qui che hai scardinato lo scroto?",
         "ma smettila di fare il gazzabbubbo di turno, che qui non siamo al circo!",
         "se continui a parlare così, finisci dritto dritto nel manuale del perfetto spruzzafuffa",
-        "ma sei proprio un mestolone di gorgoglione oggi, eh?",
-        "ti sgorfo negli occhi",
-        "oh, gazzabbubbo ufficiale, la parola la passiamo anche agli altri o no?",
-        "sembri un frastugliacazzi, vai avanti all’infinito!",
-        "basta con questa manfrina da scatafasco ambulante!",
-        "ma quanto hai bevuto dal calderone della logorrina oggi?",
-        "Hai intenzione di brevettare questa infinita marea di cagate?",
-        "Va bene, ho capito, il mondo ruota intorno alla tua voce sgradevole oggi!",
         "Non ti stanchi mai di sentire il suono delle tue stesse stronzate?",
         "Aspetta, fammi respirare tra una frase e l’altra minchia!",
-        "Se parlassi un po’ di meno, potremmo forse risolvere questo problema prima di domani",
         "Se le parole fossero denaro, potresti comprarti un biglietto per andare affanculo",
         "Mi fai sentire come se stessi leggendo il manuale di un elettrodomestico",
         "Hai già conquistato il trofeo del scassacazzi dell’anno, possiamo passare oltre?",
-        "parli come se ti pagassero a parola, e ti stai facendo ricco",
         "hai aperto bocca e si è suicidato un neurone",
         "sei il riassunto parlato di un errore di sistema",
         "il tuo discorso è il reboot inutile di un film già brutto",
