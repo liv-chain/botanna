@@ -7,7 +7,7 @@ namespace AveManiaBot;
 
 public class MessageHelper
 {
-    public static (bool hasExceeded, int count, DateTime? date, double timeSpan) CheckActivityArrest(string senderName, DbRepo repo, DateTime messageDateTime)
+    public static (bool hasExceeded, int count, DateTime? date, double timeSpan) CheckActivityArrest(string senderName, IDbRepo repo, DateTime messageDateTime)
     {
         return repo.HasAuthorExceededLimit(senderName, AmConstants.ActivityWarningLimit, messageDateTime);
     }
@@ -92,7 +92,7 @@ public class MessageHelper
         return AmConstants.Remarks[index];
     }
 
-    public static async Task<(bool hasExceeded, int count)> CheckPenaltyArrest(string senderName, DbRepo repo, DateTime messageDateTime)
+    public static async Task<(bool hasExceeded, int count)> CheckPenaltyArrest(string senderName, IDbRepo repo, DateTime messageDateTime)
     {
         (bool hasExceeded, int count) checkPenalResult = 
             await repo.HasAuthorExceededPenalLimit(senderName, messageDateTime);

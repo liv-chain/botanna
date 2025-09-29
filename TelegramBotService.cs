@@ -12,9 +12,11 @@ namespace AveManiaBot;
 public class TelegramBotService(
     ITelegramBotClient botClient,
     ILogger<TelegramBotService> logger,
-    MessageHandler messageHandler)
+    IMessageHandler messageHandler)
     : BackgroundService
 {
+    private Timer? _periodicTimer;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Configurazione delle opzioni di ricezione
@@ -57,6 +59,41 @@ public class TelegramBotService(
             {
                 logger.LogError(ex2, "Failed to retrieve bot information");
             }
+        }
+
+        // Avvio del timer per l'invio periodico dell'ora
+        StartPeriodicTimeMessage(stoppingToken);
+
+        // Mantiene il servizio in esecuzione
+        await Task.Delay(Timeout.Infinite, stoppingToken);
+    }
+
+    private void StartPeriodicTimeMessage(CancellationToken cancellationToken)
+    {
+        // Timer che si attiva ogni 10 minuti (600000 millisecondi)
+        _periodicTimer = new Timer(async _ => await SendTimeMessage(cancellationToken), 
+            null, 
+            TimeSpan.Zero, // Delay iniziale (invia subito il primo messaggio)
+            TimeSpan.FromMinutes(10)); // Intervallo di 10 minuti
+
+        logger.LogInformation("Timer per messaggi periodici dell'ora avviato (ogni 10 minuti)");
+    }
+
+    private async Task SendTimeMessage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var currentTime = DateTime.Now.ToString("HH:mm:ss dd/MM/yyyy");
+            await botClient.SendTextMessageAsync(
+                chatId: AmConstants.AmChatId,
+                text: $"🕐 Ora attuale: {currentTime}",
+                cancellationToken: cancellationToken);
+
+            logger.LogInformation("Messaggio dell'ora inviato: {Time}", currentTime);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Errore nell'invio del messaggio periodico dell'ora");
         }
     }
 
@@ -112,5 +149,11 @@ public class TelegramBotService(
     {
         logger.LogError(exception, "An error occurred");
         return Task.CompletedTask;
+    }
+
+    public override void Dispose()
+    {
+        _periodicTimer?.Dispose();
+        base.Dispose();
     }
 }

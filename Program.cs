@@ -12,13 +12,11 @@ class Program
             .ConfigureServices((context, services) =>
             {
                 // Configurazione del bot client come singleton
-                services.AddSingleton<ITelegramBotClient>(sp => 
-                    new TelegramBotClient(AmConstants.BotToken));
+                services.AddSingleton<ITelegramBotClient, TelegramBotClient>(sp => new TelegramBotClient(AmConstants.BotToken));
 
-                // Registrazione di altri servizi
-                services.AddSingleton<DbRepo>();
-                services.AddSingleton<MessageHandler>();
-                
+                // Registrazione di altri servizi - pass connection string from AmConstants
+                services.AddSingleton<IDbRepo, DbRepo>(sp => new DbRepo(AmConstants.ConnectionString));
+                services.AddSingleton<IMessageHandler, MessageHandler>();
                 // Configurazione del servizio di hosting del bot
                 services.AddHostedService<TelegramBotService>();
             })
@@ -28,4 +26,3 @@ class Program
         await host.RunAsync();
     }
 }
-
