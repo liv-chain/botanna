@@ -13,12 +13,16 @@ class Program
             {
                 // Configurazione del bot client come singleton
                 services.AddSingleton<ITelegramBotClient, TelegramBotClient>(sp => new TelegramBotClient(AmConstants.BotToken));
-
+                services.AddHostedService<Botanna>();
+                
                 // Registrazione di altri servizi - pass connection string from AmConstants
-                services.AddSingleton<IDbRepo, DbRepo>(sp => new DbRepo(AmConstants.ConnectionString));
+                services.AddSingleton<IDbRepo, DbRepo>();
                 services.AddSingleton<IMessageHandler, MessageHandler>();
+                
                 // Configurazione del servizio di hosting del bot
-                services.AddHostedService<TelegramBotService>();
+                services.AddSingleton<IDbConnectionFactory>(provider => new DbConnectionFactory(AmConstants.ConnectionString));
+                services.AddScoped<IDbRepo, DbRepo>();
+
             })
             .Build();
 

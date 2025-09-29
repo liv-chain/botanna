@@ -6,11 +6,14 @@ using static AveManiaBot.AmConstants;
 
 namespace AveManiaBot;
 
-public class DbRepo(string connectionString) : IDbRepo
+public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
 {
+    
+    private readonly IDbConnectionFactory _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+    
     private const string AmTableName = "ave_mania";
     private const string PenaltyTableName = "penalties";
-    
+
     private const string CreateTableQuery =
         $"CREATE TABLE IF NOT EXISTS {AmTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
 
@@ -32,28 +35,35 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public void InitDataBase(bool initData)
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
+        using (var command = new SQLiteCommand(CreateTableQuery, connection))
         {
-            connection.Open();
-            using (var command = new SQLiteCommand(CreateTableQuery, connection))
-            {
-                command.ExecuteNonQuery();
-            }
-
-            using (var command = new SQLiteCommand(CreatePenaltyTableQuery, connection))
-            {
-                command.ExecuteNonQuery();
-            }
-
-            if (!initData)
-            {
-                return;
-            }
-
-            Console.WriteLine("Importing data...");
-            List<ChatData> chatData = LoadChatDataFromJsonFiles();
-            ImportChatData(chatData, connection);
+            command.ExecuteNonQuery();
         }
+
+        using (var command = new SQLiteCommand(CreatePenaltyTableQuery, connection))
+        {
+            command.ExecuteNonQuery();
+        }
+
+        // Get list of all tables in the database
+        List<string> tableNames = new();
+        using (var command = new SQLiteCommand("SELECT name FROM sqlite_master WHERE type='table'", connection))
+        {
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                tableNames.Add(reader["name"].ToString() ?? string.Empty);
+            }
+        }
+        if (!initData)
+        {
+            return;
+        }
+
+        Console.WriteLine("Importing data...");
+        List<ChatData> chatData = LoadChatDataFromJsonFiles();
+        ImportChatData(chatData, connection);
     }
 
     /// <summary>
@@ -160,8 +170,8 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public AveMania? Find(int entryId)
     {
-        using var connection = new SQLiteConnection(connectionString);
-        connection.Open();
+        var connection = _connectionFactory.CreateConnection();
+        
         using var command = new SQLiteCommand(SelectWhereIdQuery, connection);
         command.Parameters.AddWithValue("@id", entryId);
         using var reader = command.ExecuteReader();
@@ -178,15 +188,14 @@ public class DbRepo(string connectionString) : IDbRepo
                 messageId
             );
         }
-
         return null;
     }
 
     public List<AveMania> FindMessagesContaining(string searchText)
     {
         List<AveMania> results = new();
-        using var connection = new SQLiteConnection(connectionString);
-        connection.Open();
+        using var connection = _connectionFactory.CreateConnection();
+        
         string query = $"SELECT * FROM {AmTableName} WHERE message LIKE '%' || @searchText || '%'";
         using var command = new SQLiteCommand(query, connection);
         command.Parameters.AddWithValue("@searchText", searchText);
@@ -219,9 +228,9 @@ public class DbRepo(string connectionString) : IDbRepo
     private List<DateTime> GetLastNMessageAndPenaltyDates(string author, int n)
     {
         var dates = new List<DateTime>();
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             string query = $@"
                 SELECT datetime FROM {AmTableName} WHERE author = @Author
                 UNION ALL
@@ -252,9 +261,9 @@ public class DbRepo(string connectionString) : IDbRepo
     public (bool hasExceeded, int count, DateTime? date, double timeSpan) HasAuthorExceededLimit(string author,
         int limit, DateTime messageDateTime)
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             string query = $@"
             SELECT 
                 (SELECT COUNT(*) 
@@ -302,9 +311,9 @@ public class DbRepo(string connectionString) : IDbRepo
     public async Task<(bool hasExceeded, int count)> HasAuthorExceededPenalLimit(string author,
         DateTime messageDateTime)
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             string query = $@"             
                 SELECT COUNT(*) 
                  FROM {PenaltyTableName} 
@@ -334,9 +343,9 @@ public class DbRepo(string connectionString) : IDbRepo
 
     private DateTime? GetOldestMessageDateForAuthorInLastHours(string author, int hours, DateTime messageDateTime)
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
 
             string query = $@"
                 SELECT MIN(datetime)
@@ -371,11 +380,11 @@ public class DbRepo(string connectionString) : IDbRepo
     /// </returns>
     public int? CheckPenalty(string messageText)
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
             try
             {
-                connection.Open();
+                
                 using (var command = new SQLiteCommand(SelectWhereQuery, connection))
                 {
                     command.Parameters.AddWithValue("@message", messageText);
@@ -406,9 +415,9 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public int Insert(AveMania aveMania)
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             using (var command = new SQLiteCommand(InsertCommand, connection))
             {
                 command.Parameters.AddWithValue("@message", aveMania.Message);
@@ -423,9 +432,9 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public void Insert(Penalty penalty)
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             using (var command = new SQLiteCommand(InsertPenaltyCommand, connection))
             {
                 command.Parameters.AddWithValue("@message", penalty.Message);
@@ -438,9 +447,9 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public long Count()
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             using (var command = new SQLiteCommand(CountQuery, connection))
             {
                 var result = command.ExecuteScalar();
@@ -451,9 +460,9 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public void DeleteDuplicates()
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
 
             // Deleting duplicate rows while keeping the one with the smallest id
             string deleteDuplicatesQuery = $@"
@@ -475,9 +484,9 @@ public class DbRepo(string connectionString) : IDbRepo
     public List<AveMania> GetRandom(int n)
     {
         var randomAveManias = new List<AveMania>();
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
 
             string query = $@"
             SELECT * FROM {AmTableName}
@@ -513,9 +522,9 @@ public class DbRepo(string connectionString) : IDbRepo
     {
         Dictionary<string, int> daysSinceLastMessages = new Dictionary<string, int>();
 
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
 
             string query = $@"
             SELECT author, MAX(datetime) AS lastMessageDate 
@@ -545,9 +554,9 @@ public class DbRepo(string connectionString) : IDbRepo
     public List<AveMania> GetLast(int i)
     {
         var results = new List<AveMania>();
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             string query = $@"SELECT * FROM {AmTableName} WHERE datetime >= @fromTime ORDER BY datetime DESC";
 
             using (var command = new SQLiteCommand(query, connection))
@@ -577,9 +586,9 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public Dictionary<string, int> GetPenaltiesForAllAuthors()
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             string query = $@"
             SELECT author, COUNT(*) AS penaltyCount
             FROM {PenaltyTableName}
@@ -606,9 +615,9 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public void Execute(string messageText)
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             var cmd = messageText.Replace("/sqlcmd ", "");
             using (var command = new SQLiteCommand(cmd, connection))
             {
@@ -623,9 +632,9 @@ public class DbRepo(string connectionString) : IDbRepo
     {
         Dictionary<string, int> authorCounts = new();
 
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             string query = $@"
             SELECT author, COUNT(*) AS messageCount
             FROM {AmTableName}
@@ -658,9 +667,9 @@ public class DbRepo(string connectionString) : IDbRepo
     {
         Dictionary<string, double> authorRatios = new Dictionary<string, double>();
 
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
             string query = $@"
             SELECT 
                 a.author, 
@@ -702,9 +711,9 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public DateTime? GetLastMessageDateTime()
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
 
             string query = $@"SELECT MAX(datetime) AS lastMessageDateTime FROM {AmTableName}";
 
@@ -732,7 +741,7 @@ public class DbRepo(string connectionString) : IDbRepo
     /// <param name="newMessage">The new value to update the message column with</param>
     public async Task Update(int messageId, string newMessage)
     {
-        await using var connection = new SQLiteConnection(connectionString);
+        await using var connection = _connectionFactory.CreateConnection();
         await connection.OpenAsync();
         await using var command = new SQLiteCommand(UpdateMessageCommand, connection);
         command.Parameters.AddWithValue("@message", newMessage);
@@ -747,8 +756,7 @@ public class DbRepo(string connectionString) : IDbRepo
     /// <returns></returns>
     public string GetOriginalText(int messageId)
     {
-        using var connection = new SQLiteConnection(connectionString);
-        connection.Open();
+        using var connection = _connectionFactory.CreateConnection();
 
         string query = $"SELECT message FROM {AmTableName} WHERE messageId = @messageId";
         using var command = new SQLiteCommand(query, connection);
@@ -760,9 +768,9 @@ public class DbRepo(string connectionString) : IDbRepo
 
     public void EnsureSchemaAndUpdate()
     {
-        using (var connection = new SQLiteConnection(connectionString))
+        using var connection = _connectionFactory.CreateConnection();
         {
-            connection.Open();
+            
 
             // Check if the `messageId` column exists, if not, add it
             var checkMessageIdColumnQuery = $"PRAGMA table_info({AmTableName});";
@@ -814,66 +822,4 @@ public class DbRepo(string connectionString) : IDbRepo
             }
         }
     }
-}
-
-public interface IDbRepo
-{
-    void InitDataBase(bool initData);
-
-    /// <summary>
-    /// Processes unprocessed Telegram messages by loading data from JSON files
-    /// and importing the chat messages into the system.
-    /// </summary>
-    /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests during the asynchronous operation.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken);
-
-    AveMania? Find(int entryId);
-    List<AveMania> FindMessagesContaining(string searchText);
-
-    (bool hasExceeded, int count, DateTime? date, double timeSpan) HasAuthorExceededLimit(string author,
-        int limit, DateTime messageDateTime);
-
-    Task<(bool hasExceeded, int count)> HasAuthorExceededPenalLimit(string author,
-        DateTime messageDateTime);
-
-    /// <summary>
-    /// Checks if a message with the specified text already exists in the database
-    /// and retrieves its corresponding identifier.
-    /// </summary>
-    /// <param name="messageText">The text of the message to check for existence in the database.</param>
-    /// <returns>
-    /// The identifier of the existing message if found, or null if the message is not present in the database.
-    /// </returns>
-    int? CheckPenalty(string messageText);
-
-    int Insert(AveMania aveMania);
-    void Insert(Penalty penalty);
-    long Count();
-    void DeleteDuplicates();
-    List<AveMania> GetRandom(int n);
-    Dictionary<string, int> GetDaysSinceLastMessageForAllAuthors();
-    List<AveMania> GetLast(int i);
-    Dictionary<string, int> GetPenaltiesForAllAuthors();
-    void Execute(string messageText);
-    Task<Dictionary<string, int>> GetAveManiaCountPerAuthor();
-    Dictionary<string, double> GetPenaltiesRatioStats();
-    DateTime? GetLastMessageDateTime();
-
-    /// <summary>
-    /// Update the message column with the value of newAm where messageId matches the parameter
-    /// </summary>
-    /// <param name="messageId">The id of the message to be updated</param>
-    /// <param name="newMessage">The new value to update the message column with</param>
-    Task Update(int messageId, string newMessage);
-
-    /// <summary>
-    /// Get the original text from am_table based on message id
-    /// </summary>
-    /// <param name="messageId"></param>
-    /// <returns></returns>
-    string GetOriginalText(int messageId);
-
-    void EnsureSchemaAndUpdate();
 }

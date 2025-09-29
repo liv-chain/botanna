@@ -9,11 +9,7 @@ using Telegram.Bot.Types.Enums;
 
 namespace AveManiaBot;
 
-public class TelegramBotService(
-    ITelegramBotClient botClient,
-    ILogger<TelegramBotService> logger,
-    IMessageHandler messageHandler)
-    : BackgroundService
+public class Botanna(ITelegramBotClient botClient, ILogger<Botanna> logger, IMessageHandler messageHandler) : BackgroundService
 {
     private Timer? _periodicTimer;
 
@@ -71,8 +67,8 @@ public class TelegramBotService(
     private void StartPeriodicTimeMessage(CancellationToken cancellationToken)
     {
         // Timer che si attiva ogni 10 minuti (600000 millisecondi)
-        _periodicTimer = new Timer(async _ => await SendTimeMessage(cancellationToken), 
-            null, 
+        _periodicTimer = new Timer(async _ => await SendTimeMessage(cancellationToken),
+            null,
             TimeSpan.Zero, // Delay iniziale (invia subito il primo messaggio)
             TimeSpan.FromMinutes(10)); // Intervallo di 10 minuti
 
