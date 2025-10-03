@@ -4,7 +4,7 @@ namespace AveManiaBot;
 
 public interface IDbRepo
 {
-    void InitDataBase(bool initData);
+    void InitTables(bool initData);
 
     /// <summary>
     /// Processes unprocessed Telegram messages by loading data from JSON files
@@ -62,4 +62,6 @@ public interface IDbRepo
     string GetOriginalText(int messageId);
 
     void EnsureSchemaAndUpdate();
+    List<BotannaRequest> GetBotannaRequests(string author);
+    void InsertBotannaRequest(BotannaRequest botannaRequest);
 }

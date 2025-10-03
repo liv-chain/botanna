@@ -7,7 +7,12 @@ using File = System.IO.File;
 
 namespace AveManiaBot;
 
-public class MessageHandler(ITelegramBotClient botClient, IDbRepo dbRepo) : IMessageHandler
+/// <summary>
+/// 
+/// </summary>
+/// <param name="botClient"></param>
+/// <param name="dbRepo"></param>
+public class BotannaMessageHandler(ITelegramBotClient botClient, IDbRepo dbRepo) : IMessageHandler
 {
     /// <summary>
     /// Processes messages sent in a group or supergroup chat. Handles specific message content,
@@ -116,7 +121,7 @@ public class MessageHandler(ITelegramBotClient botClient, IDbRepo dbRepo) : IMes
             // commands with arguments
             if (messageText.ToLower().StartsWith("/s ") || messageText.ToLower().StartsWith("s "))
             {
-                await SearchResults(cancellationToken, chatId, messageText);
+                await SearchResults(cancellationToken, chatId, messageText, author);
                 return;
             }
 
@@ -444,12 +449,22 @@ public class MessageHandler(ITelegramBotClient botClient, IDbRepo dbRepo) : IMes
     }
 
     private async Task SearchResults(CancellationToken cancellationToken,
-        long chatId,
-        string messageText)
+        long chatId, string messageText, string author)
     {
         string am = Helpers.GetArgument(messageText);
         if (Helpers.IsAveMania(am.ToUpper()))
         {
+            if (dbRepo.GetBotannaRequests(author).Count >= AmConstants.MaxBotannaRequests)
+            {
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text: $"{AmConstants.HandEmojis.WritingHand} Puoi effettuare solo {AmConstants.MaxBotannaRequests} richieste ogni 24 ore. Passa a Botanna+ per avere richieste illimitate! {AmConstants.HandEmojis.FlexedBiceps}.",
+                    cancellationToken: cancellationToken);
+                return;
+            }
+            
+            dbRepo.InsertBotannaRequest(new BotannaRequest(0, author, am, DateTime.Now));;
+                
             var argument = Helpers.GetArgument(messageText);
             List<AveMania> results = dbRepo.FindMessagesContaining(argument.ToUpper());
             if (results.Count > 0)

@@ -8,17 +8,23 @@ namespace AveManiaBot;
 
 public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
 {
-    
     private readonly IDbConnectionFactory _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
-    
+
     private const string AmTableName = "ave_mania";
     private const string PenaltyTableName = "penalties";
+    private const string BotannaRequestsTableName = "botanna_requests";
+
+    private const string InsertBotannaRequestQuery =
+        $"INSERT INTO {BotannaRequestsTableName} (author, message, datetime) VALUES (@Author, @Message, @DateTime)";
 
     private const string CreateTableQuery =
         $"CREATE TABLE IF NOT EXISTS {AmTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
 
     private const string CreatePenaltyTableQuery =
         $"CREATE TABLE IF NOT EXISTS {PenaltyTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, author TEXT, datetime DATETIME)";
+
+    private const string CreateBotannaRequestsTableQuery =
+        $"CREATE TABLE IF NOT EXISTS {BotannaRequestsTableName} (id INTEGER PRIMARY KEY AUTOINCREMENT, author TEXT, message TEXT, datetime DATETIME)";
 
     private const string InsertCommand =
         $"INSERT INTO {AmTableName} (message, author, datetime, messageId) VALUES (@message, @author, @datetime, @messageId)";
@@ -33,7 +39,7 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     private const string SelectWhereQuery = $"SELECT * FROM {AmTableName} WHERE message = @message";
     private const string SelectWhereIdQuery = $"SELECT * FROM {AmTableName} WHERE id = @id";
 
-    public void InitDataBase(bool initData)
+    public void InitTables(bool initData)
     {
         using var connection = _connectionFactory.CreateConnection();
         using (var command = new SQLiteCommand(CreateTableQuery, connection))
@@ -46,16 +52,11 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
             command.ExecuteNonQuery();
         }
 
-        // Get list of all tables in the database
-        List<string> tableNames = new();
-        using (var command = new SQLiteCommand("SELECT name FROM sqlite_master WHERE type='table'", connection))
+        using (var command = new SQLiteCommand(CreateBotannaRequestsTableQuery, connection))
         {
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-            {
-                tableNames.Add(reader["name"].ToString() ?? string.Empty);
-            }
+            command.ExecuteNonQuery();
         }
+
         if (!initData)
         {
             return;
@@ -75,26 +76,26 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken)
     {
-         Console.WriteLine("Importing data from unprocessed telegram messages...");
-         var chatData = LoadTelegramChatDataFromJsonFiles();
-         if (chatData != null) await ImportChatData(chatData.Messages, botClient, cancellationToken);
+        Console.WriteLine("Importing data from unprocessed telegram messages...");
+        var chatData = LoadTelegramChatDataFromJsonFiles();
+        if (chatData != null) await ImportChatData(chatData.Messages, botClient, cancellationToken);
     }
 
-    private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient, 
+    private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient,
         CancellationToken cancellationToken)
     {
         DateTime? lastMessageDateTime = GetLastMessageDateTime();
         long unixTime = ((DateTimeOffset)lastMessageDateTime!).ToUnixTimeSeconds();
-    
+
         var messages = chatDataMessages.Where(m => long.Parse(m.DateUnixtime) > unixTime);
         foreach (AveManiaBot.JsonData.Telegram.Message m in messages)
         {
             // verifica se è già nel db
             string message = m.Text!;
-    
+
             bool isAm = Helpers.IsAveMania(message);
             if (!isAm) continue;
-    
+
             int? existingMessageId = CheckPenalty(message);
             if (existingMessageId.HasValue)
             {
@@ -112,10 +113,12 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
                 {
                     Insert(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now, m.MessageId));
                 }
+
                 Console.WriteLine($"{DateTime.Now:u} Message does not exist in the database. Adding an AveMania message.");
             }
         }
     }
+
     private TelegramChatData? LoadTelegramChatDataFromJsonFiles()
     {
         string jsonContent = File.ReadAllText("jsondata/result.json");
@@ -171,7 +174,7 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     public AveMania? Find(int entryId)
     {
         var connection = _connectionFactory.CreateConnection();
-        
+
         using var command = new SQLiteCommand(SelectWhereIdQuery, connection);
         command.Parameters.AddWithValue("@id", entryId);
         using var reader = command.ExecuteReader();
@@ -188,6 +191,7 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
                 messageId
             );
         }
+
         return null;
     }
 
@@ -195,7 +199,7 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         List<AveMania> results = new();
         using var connection = _connectionFactory.CreateConnection();
-        
+
         string query = $"SELECT * FROM {AmTableName} WHERE message LIKE '%' || @searchText || '%'";
         using var command = new SQLiteCommand(query, connection);
         command.Parameters.AddWithValue("@searchText", searchText);
@@ -230,7 +234,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
         var dates = new List<DateTime>();
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             string query = $@"
                 SELECT datetime FROM {AmTableName} WHERE author = @Author
                 UNION ALL
@@ -263,7 +266,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             string query = $@"
             SELECT 
                 (SELECT COUNT(*) 
@@ -313,7 +315,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             string query = $@"             
                 SELECT COUNT(*) 
                  FROM {PenaltyTableName} 
@@ -345,8 +346,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
-
             string query = $@"
                 SELECT MIN(datetime)
                 FROM {AmTableName}
@@ -384,7 +383,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
         {
             try
             {
-                
                 using (var command = new SQLiteCommand(SelectWhereQuery, connection))
                 {
                     command.Parameters.AddWithValue("@message", messageText);
@@ -417,7 +415,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             using (var command = new SQLiteCommand(InsertCommand, connection))
             {
                 command.Parameters.AddWithValue("@message", aveMania.Message);
@@ -434,7 +431,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             using (var command = new SQLiteCommand(InsertPenaltyCommand, connection))
             {
                 command.Parameters.AddWithValue("@message", penalty.Message);
@@ -449,7 +445,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             using (var command = new SQLiteCommand(CountQuery, connection))
             {
                 var result = command.ExecuteScalar();
@@ -462,8 +457,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
-
             // Deleting duplicate rows while keeping the one with the smallest id
             string deleteDuplicatesQuery = $@"
                 DELETE FROM {AmTableName}
@@ -486,8 +479,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
         var randomAveManias = new List<AveMania>();
         using var connection = _connectionFactory.CreateConnection();
         {
-            
-
             string query = $@"
             SELECT * FROM {AmTableName}
             ORDER BY RANDOM()
@@ -524,8 +515,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
 
         using var connection = _connectionFactory.CreateConnection();
         {
-            
-
             string query = $@"
             SELECT author, MAX(datetime) AS lastMessageDate 
             FROM {AmTableName} 
@@ -556,7 +545,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
         var results = new List<AveMania>();
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             string query = $@"SELECT * FROM {AmTableName} WHERE datetime >= @fromTime ORDER BY datetime DESC";
 
             using (var command = new SQLiteCommand(query, connection))
@@ -588,7 +576,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             string query = $@"
             SELECT author, COUNT(*) AS penaltyCount
             FROM {PenaltyTableName}
@@ -617,7 +604,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             var cmd = messageText.Replace("/sqlcmd ", "");
             using (var command = new SQLiteCommand(cmd, connection))
             {
@@ -634,7 +620,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
 
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             string query = $@"
             SELECT author, COUNT(*) AS messageCount
             FROM {AmTableName}
@@ -669,7 +654,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
 
         using var connection = _connectionFactory.CreateConnection();
         {
-            
             string query = $@"
             SELECT 
                 a.author, 
@@ -713,8 +697,6 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     {
         using var connection = _connectionFactory.CreateConnection();
         {
-            
-
             string query = $@"SELECT MAX(datetime) AS lastMessageDateTime FROM {AmTableName}";
 
             using (var command = new SQLiteCommand(query, connection))
@@ -768,10 +750,10 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
 
     public void EnsureSchemaAndUpdate()
     {
+        InitTables(false);
+
         using var connection = _connectionFactory.CreateConnection();
         {
-            
-
             // Check if the `messageId` column exists, if not, add it
             var checkMessageIdColumnQuery = $"PRAGMA table_info({AmTableName});";
             using (var command = new SQLiteCommand(checkMessageIdColumnQuery, connection))
@@ -821,5 +803,42 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
                 }
             }
         }
+    }
+
+
+    public List<BotannaRequest> GetBotannaRequests(string author)
+    {
+        var botannaRequests = new List<BotannaRequest>();
+
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SQLiteCommand($"SELECT * FROM {BotannaRequestsTableName} WHERE author = @author AND datetime >= @startDate ORDER BY datetime DESC", connection);
+        command.Parameters.AddWithValue("@author", author);
+        command.Parameters.AddWithValue("@startDate", DateTime.UtcNow.AddHours(-24));
+        using var reader = command.ExecuteReader();
+
+        while (reader.Read())
+        {
+            botannaRequests.Add(new BotannaRequest
+            (
+                Convert.ToInt32(reader["id"]),
+                reader["author"].ToString() ?? string.Empty,
+                reader["message"].ToString() ?? string.Empty,
+                DateTime.Parse(reader["datetime"].ToString() ?? string.Empty)
+            ));
+        }
+
+        return botannaRequests;
+    }
+
+    public void InsertBotannaRequest(BotannaRequest botannaRequest)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        using var command = new SQLiteCommand(InsertBotannaRequestQuery, connection);
+
+        command.Parameters.AddWithValue("@Author", botannaRequest.Author);
+        command.Parameters.AddWithValue("@Message", botannaRequest.Message);
+        command.Parameters.AddWithValue("@DateTime", DateTime.UtcNow);
+
+        command.ExecuteNonQuery();
     }
 }

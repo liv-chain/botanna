@@ -66,13 +66,21 @@ public class Botanna(ITelegramBotClient botClient, ILogger<Botanna> logger, IMes
 
     private void StartPeriodicTimeMessage(CancellationToken cancellationToken)
     {
-        // Timer che si attiva ogni 10 minuti (600000 millisecondi)
+        var now = DateTime.Now;
+        var nextMonday = now.Date;
+        while (nextMonday.DayOfWeek != DayOfWeek.Monday || nextMonday < now)
+        {
+            nextMonday = nextMonday.AddDays(1);
+        }
+        var target = nextMonday.Date.AddHours(18);
+        var initialDelay = target > now ? target - now : target.AddDays(7) - now;
+
         _periodicTimer = new Timer(async _ => await SendTimeMessage(cancellationToken),
             null,
-            TimeSpan.Zero, // Delay iniziale (invia subito il primo messaggio)
-            TimeSpan.FromMinutes(10)); // Intervallo di 10 minuti
+            initialDelay, // Delay iniziale fino alle 18 del prossimo lunedì 
+            TimeSpan.FromDays(7)); // Intervallo di 7 giorni
 
-        logger.LogInformation("Timer per messaggi periodici dell'ora avviato (ogni 10 minuti)");
+        logger.LogInformation("Timer per messaggi periodici dell'ora avviato (ogni lunedì alle 18)");
     }
 
     private async Task SendTimeMessage(CancellationToken cancellationToken)
