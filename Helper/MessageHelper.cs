@@ -1,9 +1,10 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using AveManiaBot.Exceptions;
+using AveManiaBot.Model;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
-namespace AveManiaBot;
+namespace AveManiaBot.Helper;
 
 public class MessageHelper
 {
@@ -52,7 +53,8 @@ public class MessageHelper
         }
     }
 
-    public static async Task<string> SendPenaltyMessage(ITelegramBotClient botClient, CancellationToken cancellationToken, string senderName, string messageText, DbRepo repo,
+    public static async Task SendPenaltyMessage(ITelegramBotClient botClient, CancellationToken cancellationToken,
+        string senderName, string messageText, DbRepo repo,
         [DisallowNull] int? originalAveManiaId)
     {
         AveMania? am = repo.Find(originalAveManiaId.Value);
@@ -64,8 +66,6 @@ public class MessageHelper
             chatId: AmConstants.AmChatId,
             text,
             cancellationToken: cancellationToken).ConfigureAwait(false);
-
-        return text;
     }
 
     public static async Task RemarkUser(ITelegramBotClient botClient, CancellationToken cancellationToken, long chatId,

@@ -1,4 +1,5 @@
-﻿using Telegram.Bot;
+﻿using AveManiaBot.Model;
+using Telegram.Bot;
 
 namespace AveManiaBot;
 

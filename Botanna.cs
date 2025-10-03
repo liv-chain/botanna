@@ -9,7 +9,13 @@ using Telegram.Bot.Types.Enums;
 
 namespace AveManiaBot;
 
-public class Botanna(ITelegramBotClient botClient, ILogger<Botanna> logger, IMessageHandler messageHandler) : BackgroundService
+/// <summary>
+/// Represents a background service that integrates with a Telegram bot client to handle and process bot updates.
+/// This service starts and maintains the lifecycle of the Telegram bot, receiving updates, verifying the bot identity,
+/// and periodically sending messages or performing specific tasks.
+/// </summary>
+public class Botanna(ITelegramBotClient botClient, ILogger<Botanna> logger, IMessageHandler messageHandler)
+    : BackgroundService
 {
     private Timer? _periodicTimer;
 

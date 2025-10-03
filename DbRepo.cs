@@ -1,6 +1,8 @@
 ﻿using System.Data.SQLite;
 using System.Text.Json;
+using AveManiaBot.Helper;
 using AveManiaBot.JsonData.Telegram;
+using AveManiaBot.Model;
 using Telegram.Bot;
 using static AveManiaBot.AmConstants;
 

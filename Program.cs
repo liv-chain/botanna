@@ -1,7 +1,8 @@
-﻿using AveManiaBot;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Telegram.Bot;
+
+namespace AveManiaBot;
 
 class Program
 {

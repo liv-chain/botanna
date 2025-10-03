@@ -1,4 +1,4 @@
-﻿namespace AveManiaBot;
+﻿namespace AveManiaBot.Model;
 
 public record AveMania(string Message, string Author, long TimeStamp, DateTime DateTime, int? MessageId)
 {

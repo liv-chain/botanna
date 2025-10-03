@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AveManiaBot;
+namespace AveManiaBot.Helper;
 
 /// <summary>
 /// Text field converter for telegram text field

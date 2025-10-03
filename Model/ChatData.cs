@@ -1,6 +1,4 @@
-﻿namespace AveManiaBot;
-
-using System.Collections.Generic;
+﻿namespace AveManiaBot.Model;
 
 public class Message
 {

@@ -1,17 +1,17 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using AveManiaBot.Helper;
+using AveManiaBot.Model;
 using Telegram.Bot;
 using Telegram.Bot.Types;
-using static AveManiaBot.MessageHelper;
+using static AveManiaBot.Helper.MessageHelper;
 using File = System.IO.File;
 
 namespace AveManiaBot;
 
 /// <summary>
-/// 
+/// Handles the processing of messages for the Botanna Telegram bot.
 /// </summary>
-/// <param name="botClient"></param>
-/// <param name="dbRepo"></param>
 public class BotannaMessageHandler(ITelegramBotClient botClient, IDbRepo dbRepo) : IMessageHandler
 {
     /// <summary>
