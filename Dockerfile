@@ -1,5 +1,5 @@
-﻿FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
-USER $APP_UID
+﻿
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 WORKDIR /app
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
@@ -18,4 +18,6 @@ RUN dotnet publish "AveManiaBot.csproj" -c $BUILD_CONFIGURATION -o /app/publish 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+COPY ave_mania.db /app/ave_mania.db
+# Nota: Nessuna modifica ai permessi necessaria sui container Windows.
 ENTRYPOINT ["dotnet", "AveManiaBot.dll"]
