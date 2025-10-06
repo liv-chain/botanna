@@ -6,7 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-        <AssemblyVersion>1.4.0</AssemblyVersion>
+        <AssemblyVersion>1.4.1</AssemblyVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -35,9 +35,6 @@
       <None Remove="JsonData\photos\photo_17@19-01-2025_16-06-26.jpg" />
       <None Remove="JsonData\photos\photo_12@17-01-2025_11-03-47.jpg" />
       <None Remove="JsonData\photos\photo_11@17-01-2025_11-00-12.jpg" />
-      <None Update="ave_mania.db">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </None>
       <None Update="JsonData\result.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>

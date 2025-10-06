@@ -18,12 +18,8 @@ class Program
                 
                 // Registrazione di altri servizi - pass connection string from AmConstants
                 services.AddSingleton<IDbRepo, DbRepo>();
+                services.AddSingleton<IDbConnectionFactory, DbConnectionFactory>(sp => new DbConnectionFactory(AmConstants.ConnectionString));
                 services.AddSingleton<IMessageHandler, BotannaMessageHandler>();
-                
-                // Configurazione del servizio di hosting del bot
-                services.AddSingleton<IDbConnectionFactory>(provider => new DbConnectionFactory(AmConstants.ConnectionString));
-                services.AddScoped<IDbRepo, DbRepo>();
-
             })
             .Build();
 
