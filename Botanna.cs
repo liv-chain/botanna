@@ -93,10 +93,11 @@ public class Botanna(ITelegramBotClient botClient, ILogger<Botanna> logger, IMes
     {
         try
         {
-            var currentTime = DateTime.Now.ToString("HH:mm:ss dd/MM/yyyy");
-            await botClient.SendTextMessageAsync(
+            var r = new Random().Next(1,9);
+            var currentTime = DateTime.Now.AddHours(r).ToString("HH:mm:ss dd/MM/yyyy");
+            await botClient.SendMessage(
                 chatId: AmConstants.AmChatId,
-                text: $"🕐 Ora attuale: {currentTime}",
+                text: $"🕐 Servizio ora inesatta di botanna: {currentTime}",
                 cancellationToken: cancellationToken);
 
             logger.LogInformation("Messaggio dell'ora inviato: {Time}", currentTime);
