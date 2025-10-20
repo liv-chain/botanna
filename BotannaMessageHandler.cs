@@ -162,11 +162,11 @@ public class BotannaMessageHandler(ITelegramBotClient botClient, IDbRepo dbRepo)
                 }
                 case "/telepr":
                 {
-                    await dbRepo.ProcessTelegramMessages(botClient, cancellationToken);
+                    int inserted = await dbRepo.ProcessTelegramMessages(botClient, cancellationToken);
 
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: "Fatto",
+                        text: $"Fatto, sono stati inseriti {inserted} messaggi",
                         cancellationToken: cancellationToken);
                     break;
                 }

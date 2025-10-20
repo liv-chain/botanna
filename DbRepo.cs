@@ -76,20 +76,24 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
     /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests during the asynchronous operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    public async Task ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken)
+    public async Task<int> ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken)
     {
         Console.WriteLine("Importing data from unprocessed telegram messages...");
         var chatData = LoadTelegramChatDataFromJsonFiles();
-        if (chatData != null) await ImportChatData(chatData.Messages, botClient, cancellationToken);
+        if (chatData != null)
+        {
+            return await ImportChatData(chatData.Messages);
+        }
+
+        return 0;
     }
 
-    private async Task ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages, ITelegramBotClient botClient,
-        CancellationToken cancellationToken)
+    private async Task<int> ImportChatData(List<AveManiaBot.JsonData.Telegram.Message> chatDataMessages)
     {
         DateTime? lastMessageDateTime = GetLastMessageDateTime();
         long unixTime = ((DateTimeOffset)lastMessageDateTime!).ToUnixTimeSeconds();
-
-        var messages = chatDataMessages.Where(m => long.Parse(m.DateUnixtime) > unixTime);
+        int inserted = 0;
+        var messages = chatDataMessages; //.Where(m => long.Parse(m.DateUnixtime) > unixTime);
         foreach (AveManiaBot.JsonData.Telegram.Message m in messages)
         {
             // verifica se è già nel db
@@ -101,24 +105,27 @@ public class DbRepo(IDbConnectionFactory connectionFactory) : IDbRepo
             int? existingMessageId = CheckPenalty(message);
             if (existingMessageId.HasValue)
             {
-                Console.WriteLine($"{DateTime.Now:u} Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
-                if (m is { Text: not null, From: not null })
-                {
-                    Insert(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
-                    await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
-                }
+                // inserimento multe disabilitato
+                // Console.WriteLine($"{DateTime.Now:u} Message already exists in the database. Issuing a penalty for message ID: {existingMessageId.Value}");
+                // if (m is { Text: not null, From: not null })
+                // {
+                //     Insert(new Penalty(m.Text, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now));
+                //     await MessageHelper.SendPenaltyMessage(botClient, cancellationToken, m.From, m.Text, this, existingMessageId);
+                // }
             }
             else
             {
                 // se non esiste inserisci una ave mania
                 if (m.From != null)
                 {
-                    Insert(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), DateTime.Now, m.MessageId));
+                    Insert(new AveMania(message, m.From, ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds(), m.Date!.Value, m.MessageId));
+                    inserted++;
                 }
 
                 Console.WriteLine($"{DateTime.Now:u} Message does not exist in the database. Adding an AveMania message.");
             }
         }
+        return inserted;
     }
 
     private TelegramChatData? LoadTelegramChatDataFromJsonFiles()

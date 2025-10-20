@@ -14,7 +14,7 @@ public interface IDbRepo
     /// <param name="botClient">The Telegram bot client used to interact with the Telegram API.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests during the asynchronous operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    Task ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken);
+    Task<int> ProcessTelegramMessages(ITelegramBotClient botClient, CancellationToken cancellationToken);
 
     AveMania? Find(int entryId);
     List<AveMania> FindMessagesContaining(string searchText);
